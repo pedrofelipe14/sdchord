@@ -83,7 +83,7 @@ jobs:
           version: 6.0.13
 
       - name: Compile the engine to WebAssembly
-        run: ./scripts/build-wasm.sh
+        run: bash scripts/build-wasm.sh
 
       - uses: actions/setup-node@v4
         with:
