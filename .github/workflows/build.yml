@@ -1,7 +1,8 @@
 name: Build
 
-# Every push runs the DSP tests and builds the plugin on Windows. Pushing a tag like v0.1.0 also
-# publishes a GitHub Release with the VST3 and the Standalone app ready to download.
+# Every push runs the DSP tests, then in parallel builds and validates the plugin on Windows and builds
+# the web version (engine compiled to WebAssembly). Pushes to main deploy the web version to GitHub
+# Pages; a tag like v0.1.0 also publishes a GitHub Release with the VST3 and the Standalone app.
 on:
   push:
     branches: [main]
@@ -12,6 +13,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   dsp-tests:
@@ -68,3 +71,49 @@ jobs:
         with:
           files: Pedrochord-windows.zip
           generate_release_notes: true
+
+  web:
+    needs: dsp-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 6.0.13
+
+      - name: Compile the engine to WebAssembly
+        run: ./scripts/build-wasm.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Typecheck, tests and build
+        working-directory: web
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: web/dist
+
+  deploy-web:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: web
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
