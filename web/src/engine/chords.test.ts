@@ -1,8 +1,16 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { chordName, noteName, STRINGS, stringNotes } from './chords'
+import { chordName, COLUMN_ROOTS, noteName, STRINGS, stringNotes } from './chords'
 import { chordForKey } from './keyboard'
 
 describe('chords', () => {
+  it('lays the buttons out around the circle of fifths, like the C++ side', () => {
+    const header = readFileSync(new URL('../../../dsp/include/sdchord/chords.h', import.meta.url), 'utf8')
+    const cpp = header.match(/kColumnRoots\[12\] = \{([^}]*)\}/)![1].split(',').map(Number)
+    expect(COLUMN_ROOTS).toEqual(cpp)
+    expect(COLUMN_ROOTS.map((r) => chordName(r)).join(' ')).toBe('Db Ab Eb Bb F C G D A E B F#')
+  })
+
   it('names every chord', () => {
     expect(chordName(0)).toBe('C')
     expect(chordName(12 + 9)).toBe('Am')
@@ -23,15 +31,16 @@ describe('chords', () => {
 })
 
 describe('computer keyboard', () => {
-  it('maps each row of keys to a chord type, from C', () => {
-    expect(chordForKey('Digit1')).toBe(0) // C
-    expect(chordForKey('Equal')).toBe(11) // B
-    expect(chordForKey('KeyQ')).toBe(12) // Cm
-    expect(chordForKey('KeyP')).toBe(12 + 9) // Am
-    expect(chordForKey('Semicolon')).toBe(24 + 9) // A7 (Ñ on a Spanish layout)
-    expect(chordForKey('Backslash')).toBe(24 + 11)
-    expect(chordForKey('KeyZ')).toBe(36)
-    expect(chordForKey('Slash')).toBe(36 + 9) // the bottom row ends on Am7
+  it('maps each row of keys to a chord type, in the buttons\' order', () => {
+    expect(chordForKey('Digit1')).toBe(1) // Db
+    expect(chordForKey('Digit6')).toBe(0) // C
+    expect(chordForKey('Equal')).toBe(6) // F#
+    expect(chordForKey('KeyQ')).toBe(12 + 1) // Dbm
+    expect(chordForKey('KeyP')).toBe(12 + 4) // Em
+    expect(chordForKey('Semicolon')).toBe(24 + 4) // E7 (Ñ on a Spanish layout)
+    expect(chordForKey('Backslash')).toBe(24 + 6) // F#7
+    expect(chordForKey('KeyZ')).toBe(36 + 1)
+    expect(chordForKey('Slash')).toBe(36 + 4) // the bottom row ends on Em7
     expect(chordForKey('Space')).toBeUndefined()
     expect(chordForKey('Enter')).toBeUndefined()
   })

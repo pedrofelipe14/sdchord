@@ -17,7 +17,7 @@ const juce::Colour plateTop { 0xff34302b }, plateBottom { 0xff1f1c19 }, ridge { 
 const juce::Colour ringing { 0xffd9d3c7 }; // the ridge of a string that is sounding
 } // namespace Colours
 
-const char* const rootNames[] = { "C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B" };
+const char* const rootNames[] = { "C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B" };
 const char* const suffixes[] = { "", "m", "7", "m7" };
 const char* const rowNames[] = { "MAYOR", "MENOR", "7", "m7" };
 
@@ -152,20 +152,20 @@ void SDChordLook::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b, boo
 
 // ---- chord grid --------------------------------------------------------------------------------
 
-juce::Rectangle<float> ChordGrid::cellBounds(int root, int type) const
+juce::Rectangle<float> ChordGrid::cellBounds(int column, int type) const
 {
     const float w = ((float) getWidth() - labelWidth) / 12.0f;
     const float h = (float) getHeight() / (float) sdchord::kChordTypes;
-    return { labelWidth + w * (float) root, h * (float) type, w, h };
+    return { labelWidth + w * (float) column, h * (float) type, w, h };
 }
 
 int ChordGrid::codeAt(juce::Point<float> p) const
 {
     if (p.x < labelWidth || !getLocalBounds().toFloat().contains(p))
         return -1;
-    const int root = juce::jlimit(0, 11, (int) ((p.x - labelWidth) / (((float) getWidth() - labelWidth) / 12.0f)));
+    const int column = juce::jlimit(0, 11, (int) ((p.x - labelWidth) / (((float) getWidth() - labelWidth) / 12.0f)));
     const int type = juce::jlimit(0, sdchord::kChordTypes - 1, (int) (p.y / ((float) getHeight() / sdchord::kChordTypes)));
-    return root + 12 * type;
+    return sdchord::kColumnRoots[column] + 12 * type;
 }
 
 void ChordGrid::paint(juce::Graphics& g)
@@ -179,12 +179,12 @@ void ChordGrid::paint(juce::Graphics& g)
         g.setFont(font(12.5f, "Bold"));
         g.drawText(rowNames[type], juce::Rectangle<float>(0, row.getY(), labelWidth - 16, row.getHeight()), juce::Justification::centredRight);
 
-        for (int root = 0; root < 12; ++root)
+        for (int column = 0; column < 12; ++column)
         {
-            const int code = root + 12 * type;
+            const int code = sdchord::kColumnRoots[column] + 12 * type;
             const bool down = code == held;
             const bool remembered = held < 0 && code == memory;
-            const auto key = cellBounds(root, type).reduced(5.0f, 7.0f);
+            const auto key = cellBounds(column, type).reduced(5.0f, 7.0f);
             // The LED is lit while the chord is held, and dim for the chord the strings remember.
             drawKey(g, key, down, chordName(code), down ? 1.0f : remembered ? 0.35f : 0.0f, key.getWidth() < 40 ? 11.5f : 13.0f);
         }
@@ -478,12 +478,12 @@ void SDChordEditor::pollKeys()
     const auto& rows = keyRows();
     for (int type = 0; type < sdchord::kChordTypes; ++type)
     {
-        for (int root = 0; root < 12; ++root)
+        for (int column = 0; column < 12; ++column)
         {
-            const auto key = rows[(size_t) type][(size_t) root];
+            const auto key = rows[(size_t) type][(size_t) column];
             if (key == 0)
                 continue;
-            const int code = root + 12 * type;
+            const int code = sdchord::kColumnRoots[column] + 12 * type;
             const bool down = active && juce::KeyPress::isKeyCurrentlyDown((int) key);
             if (down == keysDown[(size_t) code])
                 continue;

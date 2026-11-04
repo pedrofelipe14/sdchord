@@ -21,7 +21,7 @@
 
 ## How it plays
 
-- **Chord buttons:** 12 roots × 4 chord types (major, minor, 7, m7). While you hold one, its chord sounds as a soft organ-like pad with the root in the bass. Slide onto another button to change chords; let go and the previous held chord comes back.
+- **Chord buttons:** 12 roots × 4 chord types (major, minor, 7, m7), laid out as on the original instrument: around the circle of fifths, Db Ab Eb Bb F C G D A E B F#, so chords that go together sit side by side. While you hold one, its chord sounds as a soft organ-like pad with the root in the bass. Slide onto another button to change chords; let go and the previous held chord comes back.
 - **Strum plate:** 13 strings, lowest at the bottom. Touch a string to pluck it or drag across them to strum; faster strums play louder. Each string plays the next tone of the current chord, so every strum is in tune. The strings keep the last chord after you let go of its button.
 - **Sound:** strings are a two-operator FM voice whose brightness fades faster than its body, so they start glassy and ring out mellow. Controls cover levels, string sustain and brightness, chorus, reverb and *wobble*, a tape-like pitch drift.
 

@@ -32,7 +32,7 @@ public:
 
 private:
     static constexpr float labelWidth = 64.0f;
-    juce::Rectangle<float> cellBounds(int root, int type) const;
+    juce::Rectangle<float> cellBounds(int column, int type) const;
     int codeAt(juce::Point<float>) const;
     void press(int source, int code);
     void release(int source);

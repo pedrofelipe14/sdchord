@@ -89,6 +89,11 @@ inline std::array<int, kStrings> stringNotes(const Chord& chord)
 //   C5-C6 (72-84)  strings 1-13 of the strum plate
 //   CC1 (mod wheel) sweeps across the strings, like a finger on the plate.
 
+/** The chord buttons' left-to-right order, as on the original instrument: around the circle of fifths,
+    Db Ab Eb Bb F C G D A E B F#, so neighbouring buttons are the chords that go together. MIDI stays
+    chromatic (C1 = C major) for playing from a DAW. */
+constexpr int kColumnRoots[12] = { 1, 8, 3, 10, 5, 0, 7, 2, 9, 4, 11, 6 };
+
 constexpr int kFirstChordNote = 24;
 constexpr int kFirstStringNote = kFirstChordNote + 12 * kChordTypes; // 72
 

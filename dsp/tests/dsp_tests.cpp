@@ -122,6 +122,19 @@ TEST(pad_voicing_stays_in_one_octave_range)
         }
 }
 
+TEST(buttons_run_around_the_circle_of_fifths)
+{
+    std::array<bool, 12> seen {};
+    for (int col = 0; col < 12; ++col)
+    {
+        seen[(size_t) kColumnRoots[col]] = true;
+        if (col > 0)
+            CHECK((kColumnRoots[col] - kColumnRoots[col - 1] + 12) % 12 == 7); // each a fifth above the last
+    }
+    CHECK(std::all_of(seen.begin(), seen.end(), [](bool s) { return s; }));
+    CHECK(kColumnRoots[0] == 1 && kColumnRoots[5] == 0 && kColumnRoots[11] == 6); // Db ... C ... F#
+}
+
 TEST(midi_layout_round_trips)
 {
     Chord c;

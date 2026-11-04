@@ -6,7 +6,10 @@ export const STRINGS = 13
 export const FIRST_CHORD_NOTE = 24
 export const FIRST_STRING_NOTE = FIRST_CHORD_NOTE + 12 * CHORD_TYPES
 
-export const ROOT_NAMES = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
+export const ROOT_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
+/** The buttons' left-to-right order, as on the original instrument: around the circle of fifths
+    (Db Ab Eb Bb F C G D A E B F#). Mirrors kColumnRoots in chords.h; MIDI stays chromatic. */
+export const COLUMN_ROOTS = [1, 8, 3, 10, 5, 0, 7, 2, 9, 4, 11, 6]
 const SUFFIXES = ['', 'm', '7', 'm7']
 const INTERVALS = [
   [0, 4, 7],

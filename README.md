@@ -21,7 +21,7 @@
 
 ## Cómo se toca
 
-- **Botones de acorde:** 12 tonalidades × 4 tipos (mayor, menor, 7 y m7). Mientras mantenés uno, suena su acorde como un colchón suave tipo órgano, con la fundamental en el bajo. Deslizá hasta otro botón para cambiar de acorde; si lo soltás, vuelve el que tenías apretado antes.
+- **Botones de acorde:** 12 tonalidades × 4 tipos (mayor, menor, 7 y m7), ordenadas como en el instrumento original: por quintas, Db Ab Eb Bb F C G D A E B F#, así los acordes que van juntos quedan al lado. Mientras mantenés uno, suena su acorde como un colchón suave tipo órgano, con la fundamental en el bajo. Deslizá hasta otro botón para cambiar de acorde; si lo soltás, vuelve el que tenías apretado antes.
 - **Franja de rasgueo:** 13 cuerdas, la más grave abajo. Tocá una para pulsarla o arrastrá sobre varias para rasguear; cuanto más rápido, más fuerte. Cada cuerda toca la siguiente nota del acorde, así que todo rasgueo suena afinado. Las cuerdas se quedan con el último acorde aunque sueltes el botón.
 - **Sonido:** las cuerdas son una voz FM de dos operadores cuyo brillo se apaga antes que el cuerpo: arrancan cristalinas y se van apagando suaves. Hay controles de niveles, sustain y brillo de las cuerdas, chorus, reverb y *wobble*, una desafinación lenta tipo cinta.
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CHORD_TYPES, ROOT_NAMES, chordName } from '../engine/chords'
+import { CHORD_TYPES, COLUMN_ROOTS, ROOT_NAMES, chordName } from '../engine/chords'
 
 interface Props {
   rowNames: string[]
@@ -95,7 +95,7 @@ export function ChordGrid({ rowNames, held, memory, latch, onPress, onRelease }:
       {Array.from({ length: CHORD_TYPES }, (_, type) => (
         <div className="chord-row" key={type}>
           <span className="row-name">{rowNames[type]}</span>
-          {Array.from({ length: 12 }, (_, root) => {
+          {COLUMN_ROOTS.map((root) => {
             const code = root + 12 * type
             const pressed = held === code || down.includes(code)
             const remembered = held < 0 && !pressed && memory === code
