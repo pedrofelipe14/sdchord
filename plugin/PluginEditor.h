@@ -12,6 +12,8 @@ class PedrochordLook : public juce::LookAndFeel_V4
 public:
     PedrochordLook();
     void drawRotarySlider(juce::Graphics&, int x, int y, int w, int h, float pos, float start, float end, juce::Slider&) override;
+    /** Toggle buttons are drawn as hardware keys with an LED. */
+    void drawToggleButton(juce::Graphics&, juce::ToggleButton&, bool highlighted, bool down) override;
 };
 
 /** 12 roots x 4 chord types. Hold a cell to play its chord; slide to change chords. Multi-touch aware. */
@@ -118,6 +120,14 @@ private:
     ChordGrid grid;
     StrumPlate plate;
     std::array<Knob, 10> knobs;
+
+    // Auto-strum panel.
+    juce::ToggleButton seqOnButton { "AUTO" }, seqSyncButton { "SYNC" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> seqOnAttachment, seqSyncAttachment;
+    std::array<Knob, 4> seqKnobs;
+    juce::Rectangle<float> seqReadout;
+    juce::String shownSeq;
+    juce::String seqReadoutText() const;
     std::vector<Section> sections;
     int shownHeld = -2, shownMemory = -2;
 

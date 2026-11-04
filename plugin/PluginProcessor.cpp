@@ -1,6 +1,9 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+juce::StringArray seqPatternNames() { return { "Arriba", "Abajo", "Ida y vuelta", "Rasgueo", "Al azar" }; }
+juce::StringArray seqRateNames() { return { "1/4", "1/8", "1/8 T", "1/16" }; }
+
 namespace
 {
 juce::NormalisableRange<float> range(float lo, float hi, float centre = -1.0f)
@@ -42,6 +45,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout PedrochordProcessor::createL
     layout.add(pct("reverb", "Reverb", d.reverb));
     layout.add(pct("wobble", "Wobble", d.wobble));
     layout.add(pct("master", "Volumen", d.master));
+
+    // Auto-strum.
+    layout.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID { "seqOn", 1 }, "Rasgueo auto", d.seqOn));
+    layout.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID { "seqSync", 1 }, "Seguir tempo del DAW", true));
+    layout.add(std::make_unique<P>(juce::ParameterID { "seqBpm", 1 }, "Tempo", juce::NormalisableRange<float>(40.0f, 240.0f, 1.0f), d.seqBpm,
+                                   juce::AudioParameterFloatAttributes().withStringFromValueFunction(
+                                       [](float v, int) { return juce::String(juce::roundToInt(v)) + " BPM"; })));
+    layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID { "seqPattern", 1 }, juce::String::fromUTF8("Patr\xc3\xb3n"),
+                                                            seqPatternNames(), d.seqPattern));
+    layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID { "seqRate", 1 }, "Figura", seqRateNames(), d.seqRate));
+    layout.add(std::make_unique<juce::AudioParameterInt>(juce::ParameterID { "seqRange", 1 }, "Cuerdas en uso", 2, pedrochord::kStrings, d.seqRange));
     return layout;
 }
 
@@ -69,6 +83,18 @@ void PedrochordProcessor::readParams()
     p.reverb = get("reverb");
     p.wobble = get("wobble");
     p.master = get("master");
+
+    p.seqOn = get("seqOn") > 0.5f;
+    p.seqPattern = juce::roundToInt(get("seqPattern"));
+    p.seqRate = juce::roundToInt(get("seqRate"));
+    p.seqRange = juce::roundToInt(get("seqRange"));
+    p.seqBpm = get("seqBpm");
+    if (get("seqSync") > 0.5f)
+        if (auto* host = getPlayHead())
+            if (const auto position = host->getPosition())
+                if (const auto bpm = position->getBpm())
+                    p.seqBpm = (float) *bpm;
+    currentBpm.store(p.seqBpm, std::memory_order_relaxed);
 }
 
 void PedrochordProcessor::handle(const juce::MidiMessage& m)

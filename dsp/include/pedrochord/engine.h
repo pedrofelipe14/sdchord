@@ -15,6 +15,21 @@
 
 namespace pedrochord
 {
+/** How the auto-strum walks the strings on each step. */
+enum class SeqPattern
+{
+    Up,
+    Down,
+    UpDown,
+    Strum, // every string on each step, alternating down and up strokes
+    Random,
+};
+constexpr int kSeqPatterns = 5;
+
+/** Step lengths: quarter, eighth, eighth triplet, sixteenth. */
+constexpr int kSeqRates = 4;
+constexpr int kStepsPerBeat[kSeqRates] = { 1, 2, 3, 4 };
+
 struct Params
 {
     float chordLevel = 0.55f; // 0..1
@@ -27,6 +42,13 @@ struct Params
     float reverb = 0.3f; // 0..1
     float wobble = 0.15f; // 0..1, tape-like pitch drift
     float master = 0.8f; // 0..1
+
+    // Auto-strum: plays the strings by itself, in time, while a chord is held.
+    bool seqOn = false;
+    float seqBpm = 100.0f; // 40..240
+    int seqPattern = 0; // SeqPattern
+    int seqRate = 1; // index into kStepsPerBeat
+    int seqRange = 8; // how many strings it uses, from the lowest (2..13)
 };
 
 class Engine
@@ -116,11 +138,13 @@ public:
         strings[(size_t) string].pluck(notes[(size_t) string], std::clamp(velocity, 0.05f, 1.0f),
                                        std::clamp(params.stringDecay, 0.2f, 8.0f), params.stringTone);
         ++plucks;
+        lastString = string;
     }
 
     void allNotesOff()
     {
         heldCount = 0;
+        pendingCount = 0;
         updateChord();
         lastStrum = -1.0f;
     }
@@ -136,6 +160,8 @@ public:
     Chord stringChord() const { return memory; }
     bool chordSounding() const { return heldCount > 0; }
     int pluckCount() const { return plucks; }
+    /** The string plucked most recently (by hand or by the auto-strum), or -1. */
+    int lastPluckedString() const { return lastString; }
 
     static int codeOf(const Chord& c) { return c.root + 12 * static_cast<int>(c.type); }
 
@@ -153,6 +179,7 @@ public:
             bassGain += (bassTarget - bassGain) * smooth;
             stringGain += (stringTarget - stringGain) * smooth;
 
+            sequencerTick();
             const float pitchMul = wobbleStep();
 
             float pad = 0.0f;
@@ -241,6 +268,82 @@ private:
         uiMemory.store(codeOf(chord), std::memory_order_relaxed);
     }
 
+    // ---- auto-strum ---------------------------------------------------------------------------
+
+    /** Runs once per sample: fires due strum plucks, and steps the sequencer while a chord is held. */
+    void sequencerTick()
+    {
+        for (int i = 0; i < pendingCount;)
+        {
+            auto& p = pending[(size_t) i];
+            if (--p.delay > 0)
+            {
+                ++i;
+                continue;
+            }
+            pluck(p.string, p.velocity);
+            p = pending[(size_t) --pendingCount];
+        }
+
+        if (!params.seqOn || heldCount == 0)
+        {
+            seqRunning = false;
+            return;
+        }
+        if (!seqRunning) // a chord was just pressed: start on the beat, right now
+        {
+            seqRunning = true;
+            seqStep = 0;
+            seqCountdown = 0.0;
+        }
+        if (seqCountdown <= 0.0)
+        {
+            fireStep();
+            ++seqStep;
+            const int rate = std::clamp(params.seqRate, 0, kSeqRates - 1);
+            seqCountdown += 60.0 / std::clamp((double) params.seqBpm, 20.0, 400.0) * sampleRate / kStepsPerBeat[rate];
+        }
+        seqCountdown -= 1.0;
+    }
+
+    void fireStep()
+    {
+        const int range = std::clamp(params.seqRange, 2, kStrings);
+        const int rate = std::clamp(params.seqRate, 0, kSeqRates - 1);
+        const bool onBeat = seqStep % kStepsPerBeat[rate] == 0;
+        const float velocity = onBeat ? 0.95f : 0.7f; // accent the first step of each beat
+
+        switch (static_cast<SeqPattern>(std::clamp(params.seqPattern, 0, kSeqPatterns - 1)))
+        {
+            case SeqPattern::Up: pluck(seqStep % range, velocity); break;
+            case SeqPattern::Down: pluck(range - 1 - seqStep % range, velocity); break;
+            case SeqPattern::UpDown:
+            {
+                const int period = 2 * range - 2;
+                const int pos = seqStep % period;
+                pluck(pos < range ? pos : period - pos, velocity);
+                break;
+            }
+            case SeqPattern::Strum:
+            {
+                // A quick sweep across the strings, 9 ms apart: down strokes on even steps, softer up strokes on odd ones.
+                const bool down = seqStep % 2 == 0;
+                const int spread = std::max(1, (int) (0.009 * sampleRate));
+                for (int i = 0; i < range && pendingCount < (int) pending.size(); ++i)
+                    pending[(size_t) pendingCount++] = { 1 + i * spread, down ? i : range - 1 - i, down ? velocity : velocity * 0.75f };
+                break;
+            }
+            case SeqPattern::Random:
+            {
+                int s = (int) (rng.next() * (float) range);
+                if (s == lastString && range > 1)
+                    s = (s + 1 + (int) (rng.next() * (float) (range - 1))) % range; // never the same string twice
+                pluck(s, velocity);
+                break;
+            }
+        }
+    }
+
     /** Tape-like pitch: a slow wow plus a wandering drift, up to a quarter semitone. */
     float wobbleStep()
     {
@@ -272,7 +375,18 @@ private:
     int heldCount = 0;
     Chord memory {}; // C major until the first chord
     float lastStrum = -1.0f;
-    int plucks = 0;
+    int plucks = 0, lastString = -1;
+
+    struct PendingPluck
+    {
+        int delay, string;
+        float velocity;
+    };
+    std::array<PendingPluck, 64> pending {};
+    int pendingCount = 0;
+    bool seqRunning = false;
+    int seqStep = 0;
+    double seqCountdown = 0.0;
 
     float smooth = 0.001f, chordGain = 0.0f, bassGain = 0.0f, stringGain = 0.0f;
     double wowPhase = 0.0;

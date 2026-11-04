@@ -4,6 +4,10 @@
 
 #include "pedrochord/engine.h"
 
+/** Display names of the auto-strum's patterns and step lengths, in engine order. */
+juce::StringArray seqPatternNames();
+juce::StringArray seqRateNames();
+
 class PedrochordProcessor : public juce::AudioProcessor
 {
 public:
@@ -36,6 +40,8 @@ public:
     void playFromUi(const juce::MidiMessage& message);
 
     const pedrochord::Engine& engine() const { return dsp; }
+    /** The tempo the auto-strum is using: the host's when synced, otherwise the Tempo knob. */
+    float autoStrumBpm() const { return currentBpm.load(std::memory_order_relaxed); }
 
     juce::AudioProcessorValueTreeState state;
 
@@ -45,6 +51,7 @@ private:
     void readParams();
 
     pedrochord::Engine dsp;
+    std::atomic<float> currentBpm { 100.0f };
     // Lock-free queue from the editor to the audio thread. (A MidiMessageCollector would keep the
     // events' relative timing, but always at the cost of one extra block of latency.)
     struct UiEvent

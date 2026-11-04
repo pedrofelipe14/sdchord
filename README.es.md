@@ -22,6 +22,12 @@
 - **Franja de rasgueo:** 13 cuerdas, la más grave abajo. Tocá una para pulsarla o arrastrá sobre varias para rasguear; cuanto más rápido, más fuerte. Cada cuerda toca la siguiente nota del acorde, así que todo rasgueo suena afinado. Las cuerdas se quedan con el último acorde aunque sueltes el botón.
 - **Sonido:** las cuerdas son una voz FM de dos operadores cuyo brillo se apaga antes que el cuerpo: arrancan cristalinas y se van apagando suaves. Hay controles de niveles, sustain y brillo de las cuerdas, chorus, reverb y *wobble*, una desafinación lenta tipo cinta.
 
+- **Rasgueo automático:** un secuenciador que toca las cuerdas solo, a tempo, mientras mantenés un acorde. Tiene cinco patrones (arriba, abajo, ida y vuelta, rasgueo completo alternando bajada y subida, y al azar), figuras de negra a semicorchea con tresillos, y un rango que define cuántas cuerdas usa. El primer paso de cada tiempo va acentuado. Con SYNC sigue el tempo del DAW. La barra espaciadora lo prende y lo apaga.
+
+### Teclado de la compu
+
+`1`–`0` mayor · `Q`–`P` menor · `A`–`Ñ` séptima · `Z`–`M` menor séptima (desde C, de izquierda a derecha, teclado latinoamericano) · espacio: rasgueo automático.
+
 ### Desde un DAW (MIDI)
 
 | Notas | Toca |
@@ -40,8 +46,8 @@ dsp/      el instrumento: C++17 header-only, sin JUCE (también va a compilar a 
   include/pedrochord/chords.h    acordes, voicings y el mapeo MIDI
   include/pedrochord/voices.h    voces de colchón, bajo y cuerdas FM
   include/pedrochord/effects.h   chorus y una reverb chica estilo Freeverb
-  include/pedrochord/engine.h    pila de acordes apretados, lógica de rasgueo y mezcla
-  tests/                       16 tests nativos
+  include/pedrochord/engine.h    pila de acordes apretados, lógica de rasgueo, el secuenciador y la mezcla
+  tests/                       22 tests nativos
 plugin/   la capa JUCE y el editor, dibujado como hardware de los 80 (cuerpo naranja, display de LEDs, placa ranurada)
 tools/    un renderizador fuera de pantalla que saca la captura de arriba
 ```
@@ -50,7 +56,7 @@ tools/    un renderizador fuera de pantalla que saca la captura de arriba
 - **Precisión de muestra.** El procesador renderiza hasta cada evento MIDI y recién ahí lo aplica, así que un rasgueo mantiene su tiempo dentro de un bloque.
 - **Nada reserva memoria en el hilo de audio.** Las líneas de delay son arrays de tamaño fijo, y la interfaz lee el estado del motor (acorde apretado, brillo de cada cuerda) desde atomics.
 - **Validado como lo cargaría un DAW:** el CI corre [pluginval](https://github.com/Tracktion/pluginval) en su nivel más estricto (10) en cada push: distintos sample rates y tamaños de bloque, guardar y restaurar estado, automatización, valores aleatorios en los parámetros y abrir el editor mientras procesa audio.
-- **Testeado sin DAW:** los voicings, el mapeo MIDI, la pila de acordes, que un rasgueo pulse las cuerdas correctas, que el decay no dependa del sample rate, y una prueba de estrés con todo al máximo que no da valores inválidos ni llega a saturar.
+- **Testeado sin DAW:** el tempo del rasgueo automático en cada figura y el orden de cada patrón, los voicings, el mapeo MIDI, la pila de acordes, que un rasgueo pulse las cuerdas correctas, que el decay no dependa del sample rate, y una prueba de estrés con todo al máximo que no da valores inválidos ni llega a saturar.
 
 ## Compilar
 
@@ -66,6 +72,7 @@ cmake -S dsp -B dsp/build && cmake --build dsp/build --config Release && dsp/bui
 
 ## Próximos pasos
 
+- [x] Rasgueo automático (secuenciador).
 - [ ] Sección rítmica: patrones de batería con un bajo automático que sigue al acorde.
 - [x] Tocar con el teclado de la compu: 1-0 mayor, Q-P menor, A-Ñ 7, Z-M m7 (teclado latinoamericano).
 - [ ] La versión web: el mismo `dsp/` compilado a WebAssembly, para tocar desde el celular.

@@ -22,6 +22,12 @@
 - **Strum plate:** 13 strings, lowest at the bottom. Touch a string to pluck it or drag across them to strum; faster strums play louder. Each string plays the next tone of the current chord, so every strum is in tune. The strings keep the last chord after you let go of its button.
 - **Sound:** strings are a two-operator FM voice whose brightness fades faster than its body, so they start glassy and ring out mellow. Controls cover levels, string sustain and brightness, chorus, reverb and *wobble*, a tape-like pitch drift.
 
+- **Auto-strum:** a sequencer that plays the strings by itself, in time, while you hold a chord. It has five patterns (up, down, up and down, full strum alternating down and up strokes, random), quarter to sixteenth-note steps including triplets, and a range that sets how many strings it uses. The first step of each beat is accented. It follows the DAW's tempo with SYNC on. Space switches it on and off.
+
+### Computer keyboard
+
+`1`–`0` major · `Q`–`P` minor · `A`–`Ñ` seventh · `Z`–`M` minor seventh (from C, left to right, Latin American layout) · space: auto-strum.
+
 ### From a DAW (MIDI)
 
 | Notes | Plays |
@@ -40,8 +46,8 @@ dsp/      the instrument: header-only C++17, no JUCE (it will also compile to We
   include/pedrochord/chords.h    chords, voicings, the MIDI layout
   include/pedrochord/voices.h    pad, bass and FM string voices
   include/pedrochord/effects.h   chorus and a small Freeverb-style reverb
-  include/pedrochord/engine.h    held-chord stack, strum logic, mixing
-  tests/                       16 native tests
+  include/pedrochord/engine.h    held-chord stack, strum logic, the auto-strum sequencer, mixing
+  tests/                       22 native tests
 plugin/   JUCE wrapper and the editor, drawn as 1980s hardware (orange body, LED readout, ribbed plate)
 tools/    an off-screen renderer that takes the screenshot above
 ```
@@ -50,7 +56,7 @@ tools/    an off-screen renderer that takes the screenshot above
 - **Sample-accurate.** The processor renders up to each MIDI event and then applies it, so a strum keeps its timing inside a block.
 - **Nothing allocates on the audio thread.** Delay lines are fixed-size arrays, and the UI reads the engine's state (held chord, string glow) from atomics.
 - **Validated like a DAW would load it:** CI runs [pluginval](https://github.com/Tracktion/pluginval) at its strictest level (10) on every push: different sample rates and block sizes, state save and restore, automation, parameter fuzzing, and opening the editor while audio runs.
-- **Tested without a DAW:** chord voicings, the MIDI layout, the held-chord stack, strums crossing the right strings, decay times that don't depend on the sample rate, and a stress test with everything at maximum that stays finite and below full scale.
+- **Tested without a DAW:** the auto-strum's timing at every step length and the order of every pattern, chord voicings, the MIDI layout, the held-chord stack, strums crossing the right strings, decay times that don't depend on the sample rate, and a stress test with everything at maximum that stays finite and below full scale.
 
 ## Building
 
@@ -66,6 +72,7 @@ cmake -S dsp -B dsp/build && cmake --build dsp/build --config Release && dsp/bui
 
 ## Roadmap
 
+- [x] Auto-strum sequencer.
 - [ ] A rhythm section: drum patterns with an auto-bass that follows the chord.
 - [x] Computer-keyboard play: 1-0 major, Q-P minor, A-Ñ 7, Z-M m7 (Latin American layout).
 - [ ] The web version: the same `dsp/` compiled to WebAssembly, playable on a phone.

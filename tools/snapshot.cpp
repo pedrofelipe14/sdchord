@@ -14,6 +14,10 @@ int main(int argc, char* argv[])
     processor.setPlayConfigDetails(0, 2, 48000.0, 512);
     processor.prepareToPlay(48000.0, 512);
 
+    // Show the auto-strum switched on, playing up and down in eighths.
+    processor.state.getParameter("seqOn")->setValueNotifyingHost(1.0f);
+    processor.state.getParameter("seqPattern")->setValueNotifyingHost(processor.state.getParameter("seqPattern")->convertTo0to1(2.0f));
+
     juce::AudioBuffer<float> buffer(2, 512);
     auto play = [&](juce::MidiBuffer midi, int blocks)
     {

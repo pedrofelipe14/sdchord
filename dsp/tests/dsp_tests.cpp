@@ -299,6 +299,117 @@ TEST(wobble_off_keeps_pitch_exact)
     CHECK(crossings >= 2 * 130 - 2);
 }
 
+// ---- auto-strum ------------------------------------------------------------------------------
+
+namespace
+{
+/** Holds C major with the auto-strum on and records which string each step plucks. */
+std::vector<int> stepsPlayed(Params p, int steps)
+{
+    auto e = makeEngine();
+    e->params = p;
+    e->params.seqOn = true;
+    e->noteOn(noteForChord(cMajor), 1.0f);
+    std::vector<int> played;
+    std::vector<float> l(1), r(1);
+    int seen = e->pluckCount();
+    for (int i = 0; i < 48000 * 30 && (int) played.size() < steps; ++i)
+    {
+        e->process(l.data(), r.data(), 1);
+        if (e->pluckCount() != seen)
+        {
+            seen = e->pluckCount();
+            played.push_back(e->lastPluckedString());
+        }
+    }
+    return played;
+}
+} // namespace
+
+TEST(auto_strum_is_off_by_default)
+{
+    auto e = makeEngine();
+    e->noteOn(noteForChord(cMajor), 1.0f);
+    render(*e, 1.0);
+    CHECK(e->pluckCount() == 0);
+}
+
+TEST(auto_strum_steps_in_time)
+{
+    auto count = [](float bpm, int rate)
+    {
+        auto e = makeEngine();
+        e->params.seqOn = true;
+        e->params.seqBpm = bpm;
+        e->params.seqRate = rate;
+        e->noteOn(noteForChord(cMajor), 1.0f);
+        render(*e, 0.99);
+        return e->pluckCount();
+    };
+    CHECK(count(120.0f, 1) == 4); // eighths at 120: steps at 0, 0.25, 0.5, 0.75 s
+    CHECK(count(120.0f, 0) == 2); // quarters
+    CHECK(count(120.0f, 2) == 6); // eighth triplets
+    CHECK(count(120.0f, 3) == 8); // sixteenths
+    CHECK(count(60.0f, 1) == 2);
+}
+
+TEST(auto_strum_patterns_walk_the_strings)
+{
+    Params p;
+    p.seqRange = 4;
+    p.seqPattern = (int) SeqPattern::Up;
+    CHECK((stepsPlayed(p, 6) == std::vector<int> { 0, 1, 2, 3, 0, 1 }));
+    p.seqPattern = (int) SeqPattern::Down;
+    CHECK((stepsPlayed(p, 6) == std::vector<int> { 3, 2, 1, 0, 3, 2 }));
+    p.seqPattern = (int) SeqPattern::UpDown;
+    CHECK((stepsPlayed(p, 8) == std::vector<int> { 0, 1, 2, 3, 2, 1, 0, 1 }));
+}
+
+TEST(random_pattern_stays_in_range_and_never_repeats_a_string)
+{
+    Params p;
+    p.seqRange = 5;
+    p.seqPattern = (int) SeqPattern::Random;
+    p.seqBpm = 240.0f;
+    p.seqRate = 3;
+    const auto played = stepsPlayed(p, 60);
+    CHECK(played.size() == 60);
+    for (size_t i = 0; i < played.size(); ++i)
+    {
+        CHECK(played[i] >= 0 && played[i] < 5);
+        if (i > 0)
+            CHECK(played[i] != played[i - 1]);
+    }
+}
+
+TEST(strum_pattern_sweeps_down_then_up)
+{
+    Params p;
+    p.seqRange = 5;
+    p.seqPattern = (int) SeqPattern::Strum;
+    p.seqBpm = 60.0f;
+    p.seqRate = 0; // one stroke per second
+    CHECK((stepsPlayed(p, 10) == std::vector<int> { 0, 1, 2, 3, 4, 4, 3, 2, 1, 0 }));
+}
+
+TEST(auto_strum_stops_when_the_chord_is_released_and_restarts_on_the_beat)
+{
+    auto e = makeEngine();
+    e->params.seqOn = true;
+    e->params.seqBpm = 120.0f;
+    e->noteOn(noteForChord(cMajor), 1.0f);
+    render(*e, 0.6); // steps at 0, 0.25, 0.5
+    CHECK(e->pluckCount() == 3);
+    e->noteOff(noteForChord(cMajor));
+    render(*e, 1.0);
+    CHECK(e->pluckCount() == 3);
+
+    e->noteOn(noteForChord(gMajor), 1.0f); // first step again, immediately, from the lowest string
+    render(*e, 0.01);
+    CHECK(e->pluckCount() == 4);
+    CHECK(e->lastPluckedString() == 0);
+}
+
 int main()
 {
     for (const auto& t : registry())

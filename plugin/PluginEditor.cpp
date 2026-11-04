@@ -65,6 +65,30 @@ void drawLed(juce::Graphics& g, juce::Point<float> c, float radius, float level)
     g.setColour(juce::Colours::white.withAlpha(0.35f + 0.3f * level));
     g.fillEllipse(juce::Rectangle<float>(radius * 0.7f, radius * 0.7f).withCentre(c.translated(-radius * 0.3f, -radius * 0.3f)));
 }
+/** A raised cream key with a small LED near the top; a pressed key sits lower in the body. */
+void drawKey(juce::Graphics& g, juce::Rectangle<float> key, bool down, const juce::String& label, float led, float fontSize)
+{
+    const float depth = down ? 1.5f : 5.0f; // how far the key stands out of the body
+
+    // Shadow and side of the key, then its face.
+    g.setColour(juce::Colours::black.withAlpha(down ? 0.12f : 0.22f));
+    g.fillRoundedRectangle(key.translated(0, depth + 1.5f), 5.0f);
+    g.setColour(Colours::keySide);
+    g.fillRoundedRectangle(key.translated(0, depth), 5.0f);
+    key.translate(0, down ? 3.5f : 0.0f);
+    g.setGradientFill(juce::ColourGradient(down ? Colours::keyBottom : Colours::keyTop, 0, key.getY(),
+                                           down ? Colours::keyBottom.darker(0.08f) : Colours::keyBottom, 0, key.getBottom(), false));
+    g.fillRoundedRectangle(key, 5.0f);
+    g.setColour(juce::Colours::white.withAlpha(down ? 0.2f : 0.7f));
+    g.drawLine(key.getX() + 4, key.getY() + 1, key.getRight() - 4, key.getY() + 1, 1.0f);
+    g.setColour(Colours::keySide.withAlpha(0.8f));
+    g.drawRoundedRectangle(key, 5.0f, 0.8f);
+
+    g.setColour(Colours::print);
+    g.setFont(font(fontSize, "Bold"));
+    g.drawText(label, key.withTrimmedTop(6.0f), juce::Justification::centred);
+    drawLed(g, { key.getCentreX(), key.getY() + 7.0f }, 2.6f, led);
+}
 } // namespace
 
 // ---- look and feel -----------------------------------------------------------------------------
@@ -76,21 +100,27 @@ PedrochordLook::PedrochordLook()
     setColour(juce::TooltipWindow::textColourId, Colours::ledOn);
 }
 
-void PedrochordLook::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h, float pos, float start, float end, juce::Slider&)
+void PedrochordLook::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h, float pos, float start, float end, juce::Slider& slider)
 {
     const auto area = juce::Rectangle<int>(x, y, w, h).toFloat();
     const float radius = juce::jmin(area.getWidth(), area.getHeight()) * 0.5f;
     const auto centre = area.getCentre();
     const float angle = start + pos * (end - start);
 
-    // Scale printed on the body around the knob.
+    // Scale printed on the body around the knob: one mark per position for stepped knobs (a switch),
+    // otherwise eleven, with the ends and the middle longer.
     g.setColour(Colours::print);
-    for (int i = 0; i <= 10; ++i)
+    const double interval = slider.getInterval();
+    const int positions = interval >= 1.0 ? (int) std::round((slider.getMaximum() - slider.getMinimum()) / interval) : 0;
+    const bool stepped = positions > 0 && positions <= 12;
+    const int marks = stepped ? positions : 10;
+    for (int i = 0; i <= marks; ++i)
     {
-        const float a = start + (end - start) * (float) i / 10.0f;
-        const float inner = radius - (i % 5 == 0 ? 6.0f : 4.0f);
+        const float a = start + (end - start) * (float) i / (float) marks;
+        const bool major = stepped || i % 5 == 0;
+        const float inner = radius - (major ? 6.0f : 4.0f);
         g.drawLine(juce::Line<float>(centre.getPointOnCircumference(inner, a), centre.getPointOnCircumference(radius - 1.0f, a)),
-                   i % 5 == 0 ? 1.4f : 0.9f);
+                   major ? 1.4f : 0.9f);
     }
 
     // Knurled black knob: shadow, ribbed skirt, domed cap.
@@ -112,6 +142,12 @@ void PedrochordLook::drawRotarySlider(juce::Graphics& g, int x, int y, int w, in
     // White pointer line.
     g.setColour(juce::Colour(0xfff2ede2));
     g.drawLine(juce::Line<float>(centre.getPointOnCircumference(cap * 0.25f, angle), centre.getPointOnCircumference(cap - 1.5f, angle)), 2.2f);
+}
+
+void PedrochordLook::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b, bool, bool down)
+{
+    const bool on = b.getToggleState();
+    drawKey(g, b.getLocalBounds().toFloat().reduced(3.0f, 2.0f).withTrimmedBottom(5.0f), down || on, b.getButtonText(), on ? 1.0f : 0.0f, 12.0f);
 }
 
 // ---- chord grid --------------------------------------------------------------------------------
@@ -148,29 +184,9 @@ void ChordGrid::paint(juce::Graphics& g)
             const int code = root + 12 * type;
             const bool down = code == held;
             const bool remembered = held < 0 && code == memory;
-            auto key = cellBounds(root, type).reduced(5.0f, 7.0f);
-            const float depth = down ? 1.5f : 5.0f; // how far the key stands out of the body
-
-            // Shadow and side of the key, then its face.
-            g.setColour(juce::Colours::black.withAlpha(down ? 0.12f : 0.22f));
-            g.fillRoundedRectangle(key.translated(0, depth + 1.5f), 5.0f);
-            g.setColour(Colours::keySide);
-            g.fillRoundedRectangle(key.translated(0, depth), 5.0f);
-            key.translate(0, down ? 3.5f : 0.0f);
-            g.setGradientFill(juce::ColourGradient(down ? Colours::keyBottom : Colours::keyTop, 0, key.getY(),
-                                                   down ? Colours::keyBottom.darker(0.08f) : Colours::keyBottom, 0, key.getBottom(), false));
-            g.fillRoundedRectangle(key, 5.0f);
-            g.setColour(juce::Colours::white.withAlpha(down ? 0.2f : 0.7f));
-            g.drawLine(key.getX() + 4, key.getY() + 1, key.getRight() - 4, key.getY() + 1, 1.0f);
-            g.setColour(Colours::keySide.withAlpha(0.8f));
-            g.drawRoundedRectangle(key, 5.0f, 0.8f);
-
-            g.setColour(Colours::print);
-            g.setFont(font(key.getWidth() < 40 ? 11.5f : 13.0f, "Bold"));
-            g.drawText(chordName(code), key.withTrimmedTop(6.0f), juce::Justification::centred);
-
-            // A small LED on each key: lit while held, dim for the chord the strings remember.
-            drawLed(g, { key.getCentreX(), key.getY() + 7.0f }, 2.6f, down ? 1.0f : remembered ? 0.35f : 0.0f);
+            const auto key = cellBounds(root, type).reduced(5.0f, 7.0f);
+            // The LED is lit while the chord is held, and dim for the chord the strings remember.
+            drawKey(g, key, down, chordName(code), down ? 1.0f : remembered ? 0.35f : 0.0f, key.getWidth() < 40 ? 11.5f : 13.0f);
         }
     }
 }
@@ -354,10 +370,31 @@ PedrochordEditor::PedrochordEditor(PedrochordProcessor& p) : AudioProcessorEdito
         k.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(processor.state, params[i].first, k.slider);
     }
 
+    // Auto-strum: on/off and sync keys, tempo and three stepped switches.
+    const std::pair<const char*, const char*> seqParams[] = {
+        { "seqBpm", "TEMPO" }, { "seqPattern", "PATR\xc3\x93N" }, { "seqRate", "FIGURA" }, { "seqRange", "CUERDAS" },
+    };
+    for (size_t i = 0; i < seqKnobs.size(); ++i)
+    {
+        auto& k = seqKnobs[i];
+        k.label = juce::String::fromUTF8(seqParams[i].second);
+        k.slider.setPopupDisplayEnabled(true, true, this);
+        k.slider.setMouseDragSensitivity(i == 0 ? 220 : 120);
+        addAndMakeVisible(k.slider);
+        k.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(processor.state, seqParams[i].first, k.slider);
+    }
+    for (auto* b : { &seqOnButton, &seqSyncButton })
+    {
+        b->setWantsKeyboardFocus(false);
+        addAndMakeVisible(*b);
+    }
+    seqOnAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor.state, "seqOn", seqOnButton);
+    seqSyncAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor.state, "seqSync", seqSyncButton);
+
     addAndMakeVisible(grid);
     addAndMakeVisible(plate);
     setWantsKeyboardFocus(true);
-    setSize(1060, 620);
+    setSize(1060, 760);
     startTimerHz(40);
     keyPoller.startTimer(4);
 }
@@ -402,6 +439,12 @@ bool isMappedKey(juce::juce_wchar c)
 
 bool PedrochordEditor::keyPressed(const juce::KeyPress& key)
 {
+    if (key == juce::KeyPress::spaceKey) // space switches the auto-strum on and off
+    {
+        if (auto* p = processor.state.getParameter("seqOn"))
+            p->setValueNotifyingHost(p->getValue() > 0.5f ? 0.0f : 1.0f);
+        return true;
+    }
     // Swallow mapped keys (auto-repeat included) so the host doesn't act on them too.
     return !key.getModifiers().isCommandDown() && isMappedKey(key.getTextCharacter());
 }
@@ -456,6 +499,19 @@ void PedrochordEditor::refreshFromEngine()
         shownMemory = memory;
         repaint(getLocalBounds().removeFromTop(100));
     }
+
+    if (const auto text = seqReadoutText(); text != shownSeq)
+    {
+        shownSeq = text;
+        repaint(seqReadout.toNearestInt().expanded(6));
+    }
+}
+
+juce::String PedrochordEditor::seqReadoutText() const
+{
+    auto value = [this](const char* id) { return juce::roundToInt(processor.state.getRawParameterValue(id)->load()); };
+    return seqPatternNames()[value("seqPattern")].toUpperCase() + "\n" + seqRateNames()[value("seqRate")] + juce::String::fromUTF8(" \xc2\xb7 ")
+           + juce::String(juce::roundToInt(processor.autoStrumBpm())) + " BPM" + (value("seqOn") ? "" : " \x01");
 }
 
 void PedrochordEditor::paint(juce::Graphics& g)
@@ -547,10 +603,46 @@ void PedrochordEditor::paint(juce::Graphics& g)
         }
     }
 
+    // Auto-strum panel.
+    {
+        const auto panel = juce::Rectangle<float>(left, seqReadout.getY() - 40, stripeRight - left, 118);
+        drawRecess(g, panel, 12.0f);
+        const float y = panel.getY() + 16, x0 = panel.getX() + 20, x1 = panel.getRight() - 20;
+        const juce::String title = juce::String::fromUTF8("RASGUEO AUTOM\xc3\x81TICO");
+        const float textWidth = 150.0f, mid = (x0 + x1) * 0.5f;
+        g.setColour(Colours::print);
+        g.setFont(font(10.5f, "Bold"));
+        g.drawText(title, juce::Rectangle<float>(mid - textWidth / 2, y - 7, textWidth, 14), juce::Justification::centred);
+        g.drawLine(x0, y, mid - textWidth / 2, y, 1.0f);
+        g.drawLine(mid + textWidth / 2, y, x1, y, 1.0f);
+        g.drawLine(x0, y, x0, y + 5, 1.0f);
+        g.drawLine(x1, y, x1, y + 5, 1.0f);
+
+        // Two-line LED readout: pattern, then step length and tempo. Dim while the auto-strum is off.
+        const bool on = !shownSeq.endsWithChar(1);
+        const auto lines = juce::StringArray::fromLines(shownSeq.upToFirstOccurrenceOf("\x01", false, false).trimEnd());
+        g.setColour(Colours::bodyEdge);
+        g.fillRoundedRectangle(seqReadout.expanded(4.0f), 8.0f);
+        g.setColour(Colours::ledWindow);
+        g.fillRoundedRectangle(seqReadout, 5.0f);
+        g.setColour(Colours::ledOn.withAlpha(on ? 1.0f : 0.4f));
+        g.setFont(font(17.0f, "Bold"));
+        g.drawText(lines[0], seqReadout.withHeight(seqReadout.getHeight() * 0.55f).translated(0, 3), juce::Justification::centred);
+        g.setFont(font(13.0f, "Bold"));
+        g.drawText(lines[1], seqReadout.withTrimmedTop(seqReadout.getHeight() * 0.5f).translated(0, -2), juce::Justification::centred);
+
+        for (const auto& k : seqKnobs)
+        {
+            g.setColour(Colours::print);
+            g.setFont(font(10.0f, "Bold"));
+            g.drawText(k.label, k.slider.getBounds().withY(k.slider.getBottom() + 1).withHeight(16), juce::Justification::centred);
+        }
+    }
+
     // How to play it from a DAW, printed small along the bottom edge.
     g.setColour(Colours::printSoft);
     g.setFont(font(10.5f));
-    g.drawText(juce::String::fromUTF8("TECLADO: 1-0 mayor \xc2\xb7 Q-P menor \xc2\xb7 A-\xc3\x91 7 \xc2\xb7 Z-M m7"),
+    g.drawText(juce::String::fromUTF8("TECLADO: 1-0 mayor \xc2\xb7 Q-P menor \xc2\xb7 A-\xc3\x91 7 \xc2\xb7 Z-M m7 \xc2\xb7 ESPACIO rasgueo auto"),
                juce::Rectangle<float>(left, (float) getHeight() - 52, 640, 16), juce::Justification::centredLeft);
     g.drawText(juce::String::fromUTF8("MIDI: C1 mayor \xc2\xb7 C2 menor \xc2\xb7 C3 7 \xc2\xb7 C4 m7 \xc2\xb7 C5-C6 cuerdas \xc2\xb7 rueda de modulaci\xc3\xb3n = rasgueo"),
                juce::Rectangle<float>(left, (float) getHeight() - 36, 640, 16), juce::Justification::centredLeft);
@@ -563,6 +655,14 @@ void PedrochordEditor::resized()
     grid.setBounds(left - 6, 118, right - left + 6, 268);
 
     // Knobs in one row, grouped with a gap between sections.
+    // Auto-strum row: the two keys, the readout, then the knobs.
+    const int seqY = 618;
+    seqOnButton.setBounds(left + 20, seqY + 4, 66, 50);
+    seqSyncButton.setBounds(left + 92, seqY + 4, 66, 50);
+    seqReadout = juce::Rectangle<float>((float) left + 180, (float) seqY + 2, 176, 52);
+    for (size_t i = 0; i < seqKnobs.size(); ++i)
+        seqKnobs[i].slider.setBounds(left + 390 + (int) i * 68, seqY - 2, 56, 56);
+
     const int knob = 58, gap = 4, sectionGap = 18, y = 462;
     int total = 0;
     for (const auto& s : sections)
