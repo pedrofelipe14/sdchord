@@ -199,6 +199,16 @@ button {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
+.key.panel-toggle {
+  flex: none;
+  width: 80px;
+  height: 44px;
+  margin-bottom: 6px;
+}
+.key.panel-toggle .key-label {
+  font-size: 11px;
+}
+
 /* ---------- layout ---------- */
 .layout {
   display: grid;
@@ -573,9 +583,15 @@ button {
     font-size: 9.5px;
   }
   .chord-readout {
-    width: 104px;
+    width: 86px;
     height: 44px;
     font-size: 21px;
+  }
+  .key.panel-toggle {
+    width: 70px;
+  }
+  .key.panel-toggle .key-label {
+    font-size: 9.5px;
   }
   .power {
     display: none;
@@ -637,11 +653,18 @@ button {
     border-radius: 4px;
     gap: 3px;
   }
+  /* The full name doesn't fit 12 keys across a phone: the root on top, the chord type small below it. */
   .key-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     font-size: 11px;
+    line-height: 1;
   }
   .key-label .suffix {
-    display: none;
+    margin-top: 2px;
+    font-size: 8.5px;
+    min-height: 8.5px;
   }
   .led {
     width: 5px;

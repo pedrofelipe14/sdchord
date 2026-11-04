@@ -33,6 +33,26 @@ const RHYTHM_KNOBS: [ParamId, KnobKey][] = [
   [ParamId.rhythmLevel, 'volume'],
 ]
 
+/** The rhythm panel starts hidden; once opened it stays open on the next visit. */
+const loadShowRhythm = (): boolean => {
+  try {
+    return localStorage.getItem('sdchord-rhythm-panel') === '1'
+  } catch {
+    return false
+  }
+}
+
+/** Hold mode defaults to on for touch screens, where holding a key and strumming at once is awkward. */
+const loadLatch = (): boolean => {
+  try {
+    const saved = localStorage.getItem('sdchord-hold')
+    if (saved !== null) return saved === '1'
+  } catch {
+    // storage blocked: fall back to the default
+  }
+  return matchMedia('(pointer: coarse)').matches
+}
+
 export default function App() {
   const engine = useMemo(() => new SDChordEngine(), [])
   const [lang, setLang] = useState<Lang>(initialLang)
@@ -40,6 +60,8 @@ export default function App() {
   const [state, setState] = useState<EngineState>(silentState)
   const [running, setRunning] = useState(false)
   const [midiInputs, setMidiInputs] = useState(0)
+  const [showRhythm, setShowRhythm] = useState(loadShowRhythm)
+  const [latch, setLatch] = useState(loadLatch)
   const t = STRINGS[lang]
 
   useEffect(() => {
@@ -48,6 +70,34 @@ export default function App() {
   }, [lang])
 
   useEffect(() => engine.onState(setState), [engine])
+  useEffect(() => engine.preload(), [engine])
+
+  // Every gesture (lifting a finger, a click, a key) tries to switch the audio on: Safari on iPhone
+  // ignores touching down, so the press that starts a chord can't do it alone.
+  useEffect(() => {
+    const unlock = () => engine.unlock()
+    const events = ['pointerup', 'touchend', 'click', 'keydown'] as const
+    for (const name of events) window.addEventListener(name, unlock, { capture: true, passive: true })
+    return () => {
+      for (const name of events) window.removeEventListener(name, unlock, { capture: true })
+    }
+  }, [engine])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('sdchord-rhythm-panel', showRhythm ? '1' : '0')
+    } catch {
+      // not remembered, still works
+    }
+  }, [showRhythm])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('sdchord-hold', latch ? '1' : '0')
+    } catch {
+      // not remembered, still works
+    }
+  }, [latch])
 
   // Space and Enter flip seqOn and rhythmOn in the UI state; this sends them on to the engine.
   const seqOnValue = values[ParamId.seqOn]
@@ -159,6 +209,21 @@ export default function App() {
             <span className={`led big${running ? ' on' : ''}`} />
             <span className="print small">{t.power}</span>
           </div>
+          {/* Hold mode: tapped chords keep sounding until another is tapped. On by default on touch screens. */}
+          <button className={`key panel-toggle${latch ? ' down' : ''}`} aria-pressed={latch} onClick={() => setLatch((v) => !v)}>
+            <span className={`led${latch ? ' on' : ''}`} />
+            <span className="key-label">{t.holdKey}</span>
+          </button>
+          {/* Shows or hides the rhythm machine's panel. The LED says whether the drums are playing, even hidden. */}
+          <button
+            className={`key panel-toggle${showRhythm ? ' down' : ''}`}
+            aria-expanded={showRhythm}
+            aria-controls="rhythm-panel"
+            onClick={() => setShowRhythm((v) => !v)}
+          >
+            <span className={`led${rhythmOn ? ' on' : ''}`} />
+            <span className="key-label">{t.sections.rhythm} {showRhythm ? '▴' : '▾'}</span>
+          </button>
           <div className="lang" role="radiogroup" aria-label="Language">
             {(['es', 'en'] as const).map((l) => (
               <button key={l} role="radio" aria-checked={lang === l} className={lang === l ? 'on' : ''} onClick={() => setLang(l)}>
@@ -180,6 +245,7 @@ export default function App() {
                 rowNames={t.rows}
                 held={state.held}
                 memory={state.memory}
+                latch={latch}
                 onPress={(code) => {
                   engine.pressChord(code)
                   started()
@@ -231,7 +297,8 @@ export default function App() {
               </div>
             </section>
 
-            <section className="recess rhythm-panel">
+            {showRhythm && (
+            <section className="recess rhythm-panel" id="rhythm-panel">
               <h2 className="bracket wide">
                 <span>{t.sections.rhythm}</span>
               </h2>
@@ -270,6 +337,7 @@ export default function App() {
               </div>
               <p className="panel-note">{t.rhythmHint}</p>
             </section>
+            )}
           </div>
 
           <StrumPlate
