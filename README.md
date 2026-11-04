@@ -27,6 +27,8 @@
 
 - **Rasgueo automático:** un secuenciador que toca las cuerdas solo, a tempo, mientras mantenés un acorde. Tiene cinco patrones (arriba, abajo, ida y vuelta, rasgueo completo alternando bajada y subida, y al azar), figuras de negra a semicorchea con tresillos, y un rango que define cuántas cuerdas usa. El primer paso de cada tiempo va acentuado. Con SYNC sigue el tempo del DAW. La barra espaciadora lo prende y lo apaga.
 
+- **LFO:** mueve los acordes y las cuerdas con vibrato, trémolo, un barrido del filtro o paneo de lado a lado, con onda seno, triángulo, cuadrada o al azar, de 0,1 a 12 Hz. El bajo queda afinado y en el centro. Una luz titila al ritmo del LFO.
+
 - **Caja de ritmos (versión web):** ocho ritmos de un compás, preprogramados al estilo de las cajas de ritmo viejas (rock, disco, balada, bossa nova, cumbia, rumba, vals y swing). Cada sonido de batería es sintetizado, sin samples: bombo, redoblante, aro, hi-hat abierto y cerrado, dos congas y cencerro. Comparte el tempo con el rasgueo automático y, mientras suena, marca el pulso: los rasgueos se enganchan a su grilla. Enter la arranca y la frena.
 
 ### Teclado de la compu
@@ -64,8 +66,8 @@ web/      la versión para navegador: React + TypeScript, con el motor en un Aud
 - **Precisión de muestra.** El procesador renderiza hasta cada evento MIDI y recién ahí lo aplica, así que un rasgueo mantiene su tiempo dentro de un bloque.
 - **Nada reserva memoria en el hilo de audio.** Las líneas de delay son arrays de tamaño fijo, y la interfaz lee el estado del motor (acorde apretado, brillo de cada cuerda) desde atomics.
 - **Validado como lo cargaría un DAW:** el CI corre [pluginval](https://github.com/Tracktion/pluginval) en su nivel más estricto (10) en cada push: distintos sample rates y tamaños de bloque, guardar y restaurar estado, automatización, valores aleatorios en los parámetros y abrir el editor mientras procesa audio.
-- **Un motor, dos casas.** El navegador corre exactamente el mismo código de `dsp/`: el AudioWorklet instancia el .wasm directamente, le manda notas y parámetros como mensajes, y recibe el acorde apretado y el nivel de cada cuerda para dibujarlos. La página tiene teclas de acorde multitouch por las que se puede deslizar el dedo, una franja que en el celu se pone horizontal, el teclado de la compu por posición física de la tecla (sirve para cualquier distribución) y controladores Web MIDI. Sus 14 tests incluyen el motor compilado y un chequeo de que los IDs de parámetros coincidan con los del C++.
-- **Testeado sin DAW:** el tempo del rasgueo automático en cada figura y el orden de cada patrón, los voicings, el mapeo MIDI, la pila de acordes, que un rasgueo pulse las cuerdas correctas, que el decay no dependa del sample rate, y una prueba de estrés con todo al máximo que no da valores inválidos ni llega a saturar.
+- **Un motor, dos casas.** El navegador corre exactamente el mismo código de `dsp/`: el AudioWorklet instancia el .wasm directamente, le manda notas y parámetros como mensajes, y recibe el acorde apretado y el nivel de cada cuerda para dibujarlos. La página tiene teclas de acorde multitouch por las que se puede deslizar el dedo, una franja que en el celu se pone horizontal, el teclado de la compu por posición física de la tecla (sirve para cualquier distribución) y controladores Web MIDI. Sus 16 tests incluyen el motor compilado y un chequeo de que los IDs de parámetros coincidan con los del C++.
+- **Testeado sin DAW:** el tempo del rasgueo automático en cada figura y el orden de cada patrón, los voicings, el mapeo MIDI, la pila de acordes, que un rasgueo pulse las cuerdas correctas, que el decay no dependa del sample rate, y que cada destino del LFO haga lo que dice (midiendo afinación, volumen, brillo y paneo en la salida), y una prueba de estrés con todo al máximo que no da valores inválidos ni llega a saturar.
 
 ## Compilar
 
@@ -84,6 +86,7 @@ cmake -S dsp -B dsp/build && cmake --build dsp/build --config Release && dsp/bui
 ## Próximos pasos
 
 - [x] Rasgueo automático (secuenciador).
+- [x] LFO con vibrato, trémolo, filtro y paneo.
 - [x] Caja de ritmos con patrones preprogramados, sincronizada con el rasgueo automático (versión web).
 - [ ] Un bajo automático que siga al acorde a tempo con la batería.
 - [x] Tocar con el teclado de la compu: 1-0 mayor, Q-P menor, A-Ñ 7, Z-M m7 (teclado latinoamericano).

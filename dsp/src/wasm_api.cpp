@@ -34,6 +34,10 @@ enum ParamId
     rhythmOn,
     rhythmPattern,
     rhythmLevel,
+    lfoDepth,
+    lfoRate,
+    lfoShape,
+    lfoTarget,
 };
 } // namespace
 
@@ -69,6 +73,10 @@ EMSCRIPTEN_KEEPALIVE void sdc_set_param(int id, float value)
         case rhythmOn: p.rhythmOn = value > 0.5f; break;
         case rhythmPattern: p.rhythmPattern = (int) value; break;
         case rhythmLevel: p.rhythmLevel = value; break;
+        case lfoDepth: p.lfoDepth = value; break;
+        case lfoRate: p.lfoRate = value; break;
+        case lfoShape: p.lfoShape = (int) value; break;
+        case lfoTarget: p.lfoTarget = (int) value; break;
         default: break;
     }
 }

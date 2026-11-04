@@ -20,6 +20,10 @@ export enum ParamId {
   rhythmOn,
   rhythmPattern,
   rhythmLevel,
+  lfoDepth,
+  lfoRate,
+  lfoShape,
+  lfoTarget,
 }
 
 export const PARAM_COUNT = Object.keys(ParamId).length / 2
@@ -32,6 +36,8 @@ export interface ParamSpec {
   def: number
   /** Snap to this step (choices and integers use 1). */
   step?: number
+  /** Knob taper: the value follows position^curve, so a curve above 1 gives the low end more travel. */
+  curve?: number
   format: (value: number, lang: Lang) => string
 }
 
@@ -40,6 +46,14 @@ export const PATTERNS: Record<Lang, string[]> = {
   en: ['Up', 'Down', 'Up & down', 'Strum', 'Random'],
 }
 export const RATES = ['1/4', '1/8', '1/8 T', '1/16']
+export const LFO_SHAPES: Record<Lang, string[]> = {
+  es: ['Seno', 'Triángulo', 'Cuadrada', 'Al azar'],
+  en: ['Sine', 'Triangle', 'Square', 'Random'],
+}
+export const LFO_TARGETS: Record<Lang, string[]> = {
+  es: ['Vibrato', 'Trémolo', 'Filtro', 'Paneo'],
+  en: ['Vibrato', 'Tremolo', 'Filter', 'Pan'],
+}
 
 /** The rhythm machine's presets, in engine order (dsp/include/sdchord/rhythm.h; a test checks the shape). */
 export const RHYTHMS: { name: Record<Lang, string>; length: number; stepsPerBeat: number }[] = [
@@ -75,11 +89,27 @@ export const PARAMS: Record<ParamId, ParamSpec> = {
   [ParamId.rhythmOn]: { min: 0, max: 1, def: 0, step: 1, format: (v) => (v ? 'ON' : 'OFF') },
   [ParamId.rhythmPattern]: { min: 0, max: RHYTHMS.length - 1, def: 0, step: 1, format: (v, lang) => RHYTHMS[Math.round(v)].name[lang] },
   [ParamId.rhythmLevel]: level(0.7),
+  [ParamId.lfoDepth]: level(0),
+  [ParamId.lfoRate]: { min: 0.1, max: 12, def: 4, curve: 2.5, format: (v) => `${v < 1 ? v.toFixed(2) : v.toFixed(1)} Hz` },
+  [ParamId.lfoShape]: { min: 0, max: 3, def: 0, step: 1, format: (v, lang) => LFO_SHAPES[lang][Math.round(v)] },
+  [ParamId.lfoTarget]: { min: 0, max: 3, def: 0, step: 1, format: (v, lang) => LFO_TARGETS[lang][Math.round(v)] },
 }
 
 export const defaultValues = (): number[] => Array.from({ length: PARAM_COUNT }, (_, id) => PARAMS[id as ParamId].def)
 
 /** Clamps a value into the parameter's range and snaps it to its step. */
+/** Where a value sits on its knob's travel, 0..1 (follows the knob's taper). */
+export function toPosition(id: ParamId, value: number): number {
+  const spec = PARAMS[id]
+  return ((value - spec.min) / (spec.max - spec.min)) ** (1 / (spec.curve ?? 1))
+}
+
+/** The value at a knob position, 0..1. */
+export function fromPosition(id: ParamId, position: number): number {
+  const spec = PARAMS[id]
+  return spec.min + (spec.max - spec.min) * Math.min(1, Math.max(0, position)) ** (spec.curve ?? 1)
+}
+
 export function clampParam(id: ParamId, value: number): number {
   const spec = PARAMS[id]
   const clamped = Math.min(spec.max, Math.max(spec.min, value))

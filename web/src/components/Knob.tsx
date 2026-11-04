@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { type Lang, PARAMS, type ParamId, clampParam } from '../engine/params'
+import { type Lang, PARAMS, type ParamId, clampParam, fromPosition, toPosition } from '../engine/params'
 
 interface Props {
   id: ParamId
@@ -23,12 +23,13 @@ const polar = (radius: number, degrees: number) => {
 export function Knob({ id, value, label, lang, onChange }: Props) {
   const spec = PARAMS[id]
   const [active, setActive] = useState(false)
-  const drag = useRef<{ y: number; value: number } | null>(null)
+  const drag = useRef<{ y: number; position: number } | null>(null)
 
   const positions = spec.step ? Math.round((spec.max - spec.min) / spec.step) : 0
   const stepped = positions > 0 && positions <= 12
   const marks = stepped ? positions : 10
-  const angle = START + ((value - spec.min) / (spec.max - spec.min)) * (END - START)
+  const position = toPosition(id, value)
+  const angle = START + position * (END - START)
   // Pixels of mouse travel for the whole range (stepped knobs click through positions sooner).
   const travel = stepped ? positions * 22 : 180
 
@@ -47,13 +48,12 @@ export function Knob({ id, value, label, lang, onChange }: Props) {
         tabIndex={-1}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId)
-          drag.current = { y: e.clientY, value }
+          drag.current = { y: e.clientY, position }
           setActive(true)
         }}
         onPointerMove={(e) => {
           if (!drag.current) return
-          const delta = ((drag.current.y - e.clientY) / travel) * (spec.max - spec.min)
-          set(drag.current.value + delta)
+          set(fromPosition(id, drag.current.position + (drag.current.y - e.clientY) / travel))
         }}
         onPointerUp={() => {
           drag.current = null
@@ -63,7 +63,7 @@ export function Knob({ id, value, label, lang, onChange }: Props) {
           drag.current = null
           setActive(false)
         }}
-        onWheel={(e) => set(value + (e.deltaY < 0 ? 1 : -1) * (spec.step ?? (spec.max - spec.min) / 50))}
+        onWheel={(e) => set(spec.step ? value + (e.deltaY < 0 ? 1 : -1) * spec.step : fromPosition(id, position + (e.deltaY < 0 ? 1 : -1) / 50))}
         onDoubleClick={() => set(spec.def)}
       >
         {Array.from({ length: marks + 1 }, (_, i) => {

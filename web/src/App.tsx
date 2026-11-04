@@ -27,6 +27,12 @@ const SEQ_KNOBS: [ParamId, KnobKey][] = [
   [ParamId.seqRate, 'rate'],
   [ParamId.seqRange, 'range'],
 ]
+const LFO_KNOBS: [ParamId, KnobKey][] = [
+  [ParamId.lfoTarget, 'target'],
+  [ParamId.lfoShape, 'shape'],
+  [ParamId.lfoRate, 'speed'],
+  [ParamId.lfoDepth, 'depth'],
+]
 const RHYTHM_KNOBS: [ParamId, KnobKey][] = [
   [ParamId.rhythmPattern, 'rhythm'],
   [ParamId.seqBpm, 'tempo'], // one tempo for the drums and the auto-strum
@@ -187,6 +193,7 @@ export default function App() {
   const holding = state.held >= 0
   const seqOn = values[ParamId.seqOn] > 0.5
   const rhythmOn = values[ParamId.rhythmOn] > 0.5
+  const lfoOn = values[ParamId.lfoDepth] > 0
   const rhythm = RHYTHMS[values[ParamId.rhythmPattern]]
   const beats = rhythm.length / rhythm.stepsPerBeat
   const onBeat = state.rhythmStep >= 0 && state.rhythmStep % rhythm.stepsPerBeat === 0
@@ -291,6 +298,31 @@ export default function App() {
                 </div>
                 <div className="knob-row">
                   {SEQ_KNOBS.map(([id, label]) => (
+                    <Knob key={id} id={id} value={values[id]} label={t.knobs[label]} lang={lang} onChange={(v) => setParam(id, v)} />
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section className="recess seq-panel lfo-panel">
+              <h2 className="bracket wide">
+                <span>{t.sections.lfo}</span>
+              </h2>
+              <div className="seq-row">
+                {/* Blinks at the LFO's speed while it has any depth. */}
+                <span
+                  className={`led big lfo-led${lfoOn ? ' on' : ''}`}
+                  style={{ animationDuration: `${1 / values[ParamId.lfoRate]}s` }}
+                  aria-hidden="true"
+                />
+                <div className={`led-window seq-readout${lfoOn ? '' : ' off'}`}>
+                  <span className="line1">{PARAMS[ParamId.lfoTarget].format(values[ParamId.lfoTarget], lang).toUpperCase()}</span>
+                  <span className="line2">
+                    {PARAMS[ParamId.lfoShape].format(values[ParamId.lfoShape], lang)} · {PARAMS[ParamId.lfoRate].format(values[ParamId.lfoRate], lang)}
+                  </span>
+                </div>
+                <div className="knob-row">
+                  {LFO_KNOBS.map(([id, label]) => (
                     <Knob key={id} id={id} value={values[id]} label={t.knobs[label]} lang={lang} onChange={(v) => setParam(id, v)} />
                   ))}
                 </div>

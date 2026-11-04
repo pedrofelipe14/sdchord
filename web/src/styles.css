@@ -677,3 +677,26 @@ button {
     display: none; /* keyboard and MIDI help means little on a phone */
   }
 }
+
+/* ---------- LFO ---------- */
+.lfo-led {
+  flex: none;
+  margin: 0 8px 0 4px;
+}
+.lfo-led.on {
+  animation: lfo-pulse 1s ease-in-out infinite;
+}
+@keyframes lfo-pulse {
+  50% {
+    opacity: 0.2;
+    box-shadow: none;
+  }
+}
+@media (max-width: 860px) {
+  .lfo-panel {
+    order: 6;
+  }
+  .rhythm-panel {
+    order: 7;
+  }
+}

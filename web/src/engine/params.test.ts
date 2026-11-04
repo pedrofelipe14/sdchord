@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { clampParam, defaultValues, PARAM_COUNT, PARAMS, ParamId } from './params'
+import { clampParam, defaultValues, fromPosition, PARAM_COUNT, PARAMS, ParamId, toPosition } from './params'
 
 const wasmApi = readFileSync(new URL('../../../dsp/src/wasm_api.cpp', import.meta.url), 'utf8')
 const engineHeader = readFileSync(new URL('../../../dsp/include/sdchord/engine.h', import.meta.url), 'utf8')
@@ -30,5 +30,13 @@ describe('parameters', () => {
     expect(clampParam(ParamId.seqRange, 40)).toBe(13)
     expect(PARAMS[ParamId.seqRate].format(2, 'es')).toBe('1/8 T')
     expect(PARAMS[ParamId.seqPattern].format(4, 'en')).toBe('Random')
+    expect(PARAMS[ParamId.lfoTarget].format(1, 'es')).toBe('Trémolo')
+    expect(PARAMS[ParamId.lfoRate].format(0.25, 'en')).toBe('0.25 Hz')
+  })
+
+  it('give tapered knobs more travel at the low end, and round-trip positions', () => {
+    expect(toPosition(ParamId.master, 0.5)).toBeCloseTo(0.5) // linear
+    expect(fromPosition(ParamId.lfoRate, 0.5)).toBeLessThan(3) // half way is a slow wobble, not 6 Hz
+    for (const v of [0.1, 0.7, 4, 12]) expect(fromPosition(ParamId.lfoRate, toPosition(ParamId.lfoRate, v))).toBeCloseTo(v)
   })
 })

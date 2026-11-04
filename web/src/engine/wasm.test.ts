@@ -71,6 +71,18 @@ describe.skipIf(!existsSync(wasmUrl))('compiled engine (sdchord.wasm)', () => {
     expect(engine.sdc_string_chord()).toBe(A_MINOR) // the strings remember it
   })
 
+  it('runs the LFO: a square tremolo silences the chord for half of each cycle', () => {
+    const engine = load()
+    for (const [id, v] of [[ParamId.bassLevel, 0], [ParamId.wobble, 0], [ParamId.chorus, 0], [ParamId.reverb, 0], [ParamId.lfoTarget, 1], [ParamId.lfoShape, 2], [ParamId.lfoRate, 2], [ParamId.lfoDepth, 1]])
+      engine.sdc_set_param(id, v)
+    engine.sdc_note_on(FIRST_CHORD_NOTE + A_MINOR, 1)
+    const down = renderRms(engine, 80) // first half of the 2 Hz cycle (0.25 s = 94 blocks): the dip
+    renderRms(engine, 20)
+    const up = renderRms(engine, 70)
+    expect(up).toBeGreaterThan(0.01)
+    expect(down).toBeLessThan(up / 10)
+  })
+
   it('plucks strings and reports how loud they ring', () => {
     const engine = load()
     engine.sdc_note_on(FIRST_STRING_NOTE + 4, 1)
