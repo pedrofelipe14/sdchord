@@ -1,0 +1,111 @@
+#pragma once
+
+#include <map>
+
+#include <juce_audio_utils/juce_audio_utils.h>
+
+#include "PluginProcessor.h"
+
+/** Knobs with a value arc in the colour of their section. */
+class RasguidoLook : public juce::LookAndFeel_V4
+{
+public:
+    RasguidoLook();
+    void drawRotarySlider(juce::Graphics&, int x, int y, int w, int h, float pos, float start, float end, juce::Slider&) override;
+};
+
+/** 12 roots x 4 chord types. Hold a cell to play its chord; slide to change chords. Multi-touch aware. */
+class ChordGrid : public juce::Component
+{
+public:
+    explicit ChordGrid(RasguidoProcessor& p) : processor(p) {}
+
+    void paint(juce::Graphics&) override;
+    void mouseDown(const juce::MouseEvent&) override;
+    void mouseDrag(const juce::MouseEvent&) override;
+    void mouseUp(const juce::MouseEvent&) override;
+
+    /** Called by the editor's timer with the engine's state. */
+    void show(int heldCode, int stringCode);
+
+private:
+    static constexpr float labelWidth = 64.0f;
+    juce::Rectangle<float> cellBounds(int root, int type) const;
+    int codeAt(juce::Point<float>) const;
+    void press(int source, int code);
+    void release(int source);
+
+    RasguidoProcessor& processor;
+    std::map<int, int> pressed; // mouse/touch source -> chord code
+    int held = -1, memory = 0;
+};
+
+/** The strum plate: 13 strings, lowest at the bottom. Touch one to pluck it, drag across to strum. */
+class StrumPlate : public juce::Component
+{
+public:
+    explicit StrumPlate(RasguidoProcessor& p) : processor(p) {}
+
+    void paint(juce::Graphics&) override;
+    void mouseDown(const juce::MouseEvent&) override;
+    void mouseDrag(const juce::MouseEvent&) override;
+    void mouseUp(const juce::MouseEvent&) override;
+
+    /** Repaints only while something rings or the chord changed. */
+    void refresh();
+
+private:
+    juce::Rectangle<float> stringArea() const;
+    float positionAt(float y) const; // 0 = bottom string, 1 = top
+    void pluck(int string, float velocity);
+
+    RasguidoProcessor& processor;
+    struct Finger
+    {
+        float position;
+        double time;
+    };
+    std::map<int, Finger> fingers;
+    std::array<float, rasguido::kStrings> glow {};
+    int chordCode = -1;
+};
+
+class RasguidoEditor : public juce::AudioProcessorEditor, private juce::Timer
+{
+public:
+    explicit RasguidoEditor(RasguidoProcessor&);
+    ~RasguidoEditor() override;
+
+    void paint(juce::Graphics&) override;
+    void resized() override;
+
+    /** Pulls the engine's state into the UI (the timer calls it 40 times a second). */
+    void refreshFromEngine();
+
+private:
+    void timerCallback() override { refreshFromEngine(); }
+
+    struct Knob
+    {
+        juce::Slider slider { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
+        juce::String label;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
+    };
+
+    struct Section
+    {
+        juce::String title;
+        juce::Colour colour;
+        int first, count;
+    };
+
+    RasguidoProcessor& processor;
+    RasguidoLook look;
+    ChordGrid grid;
+    StrumPlate plate;
+    std::array<Knob, 10> knobs;
+    std::vector<Section> sections;
+    int shownHeld = -2, shownMemory = -2;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RasguidoEditor)
+};

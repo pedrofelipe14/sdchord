@@ -1,0 +1,60 @@
+name: Build
+
+# Every push runs the DSP tests and builds the plugin on Windows. Pushing a tag like v0.1.0 also
+# publishes a GitHub Release with the VST3 and the Standalone app ready to download.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  dsp-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run the DSP tests
+        run: |
+          cmake -S dsp -B dsp/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build dsp/build --parallel
+          ./dsp/build/dsp_tests
+
+  windows:
+    needs: dsp-tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: cmake -B build -DRSG_COPY_PLUGIN=OFF
+
+      - name: Build
+        run: cmake --build build --config Release --target Rasguido_All --parallel
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $out = "Rasguido-windows"
+          New-Item -ItemType Directory $out | Out-Null
+          Copy-Item -Recurse "build/Rasguido_artefacts/Release/VST3/Rasguido.vst3" $out
+          Copy-Item "build/Rasguido_artefacts/Release/Standalone/Rasguido.exe" $out
+          Compress-Archive -Path "$out/*" -DestinationPath "$out.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Rasguido-windows
+          path: Rasguido-windows.zip
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Rasguido-windows.zip
+          generate_release_notes: true
