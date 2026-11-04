@@ -27,6 +27,26 @@ enum class SeqPattern
 };
 constexpr int kSeqPatterns = 5;
 
+/** The LFO's wave. Random holds a new value each cycle (sample and hold). */
+enum class LfoShape
+{
+    Sine,
+    Triangle,
+    Square,
+    Random,
+};
+constexpr int kLfoShapes = 4;
+
+/** What the LFO moves. It acts on the chords and the strings; the bass and the drums stay put. */
+enum class LfoTarget
+{
+    Vibrato, // pitch, up to 0.6 semitone either way
+    Tremolo, // volume, down to silence at full depth
+    Filter, // the chords' tone knob, swept up and down
+    Pan, // left and right
+};
+constexpr int kLfoTargets = 4;
+
 /** Step lengths: quarter, eighth, eighth triplet, sixteenth. */
 constexpr int kSeqRates = 4;
 constexpr int kStepsPerBeat[kSeqRates] = { 1, 2, 3, 4 };
@@ -56,6 +76,12 @@ struct Params
     bool rhythmOn = false;
     int rhythmPattern = 0; // index into rhythmPatterns()
     float rhythmLevel = 0.7f; // 0..1
+
+    // LFO.
+    float lfoDepth = 0.0f; // 0..1, 0 = off
+    float lfoRate = 4.0f; // Hz (0.1..12)
+    int lfoShape = 0; // LfoShape
+    int lfoTarget = 0; // LfoTarget
 };
 
 class Engine
@@ -75,6 +101,7 @@ public:
         reverb.prepare(sr);
         rhythm.prepare(sr);
         smooth = coefFor(0.02, sr);
+        lfoSmooth = coefFor(0.004, sr);
     }
 
     // ---- input ---------------------------------------------------------------------------------
@@ -173,6 +200,8 @@ public:
     /** The rhythm machine's current step in its bar, or -1 while it is stopped. */
     int rhythmStep() const { return uiRhythmStep.load(std::memory_order_relaxed); }
     int drumHits() const { return rhythm.hitCount(); }
+    /** The LFO's current value, -1..1 (0 while its depth is 0). */
+    float lfoLevel() const { return uiLfo.load(std::memory_order_relaxed); }
 
     static int codeOf(const Chord& c) { return c.root + 12 * static_cast<int>(c.type); }
 
@@ -197,9 +226,21 @@ public:
             advanceClock();
             const float pitchMul = wobbleStep();
 
+            // The LFO bends the chords and strings only: the bass stays in tune and in place.
+            const auto target = static_cast<LfoTarget>(std::clamp(params.lfoTarget, 0, kLfoTargets - 1));
+            const float lfo = lfoStep() * params.lfoDepth; // -depth..depth
+            float voicePitch = pitchMul, tone = params.chordTone, gain = 1.0f, pan = 0.0f;
+            switch (target)
+            {
+                case LfoTarget::Vibrato: voicePitch *= std::exp2(lfo * 0.6f / 12.0f); break;
+                case LfoTarget::Tremolo: gain = 1.0f - 0.5f * (params.lfoDepth + lfo); break;
+                case LfoTarget::Filter: tone = std::clamp(tone + 0.5f * lfo, 0.0f, 1.0f); break;
+                case LfoTarget::Pan: pan = lfo; break;
+            }
+
             float pad = 0.0f;
             for (auto& p : pads)
-                pad += p.process(pitchMul, params.chordTone);
+                pad += p.process(voicePitch, tone);
             const float low = bass.process(pitchMul) * bassGain;
 
             // Strings spread across the stereo field, low on the left, high on the right.
@@ -209,13 +250,14 @@ public:
                 auto& voice = strings[(size_t) s];
                 if (!voice.active())
                     continue;
-                const float v = voice.process(pitchMul);
+                const float v = voice.process(voicePitch);
                 sl += v * panL[(size_t) s];
                 sr += v * panR[(size_t) s];
             }
 
-            float l = pad * chordGain + sl * stringGain;
-            float r = pad * chordGain + sr * stringGain;
+            const float gl = gain * (1.0f - std::max(pan, 0.0f)), gr = gain * (1.0f + std::min(pan, 0.0f));
+            float l = (pad * chordGain + sl * stringGain) * gl;
+            float r = (pad * chordGain + sr * stringGain) * gr;
             chorus.process(l, r, params.chorus);
             const float drums = rhythm.process() * drumGain;
             l += low + drums; // bass and drums stay dry and centred (only the reverb touches them)
@@ -228,6 +270,7 @@ public:
 
         for (int s = 0; s < kStrings; ++s)
             uiGlow[(size_t) s].store(strings[(size_t) s].level(), std::memory_order_relaxed);
+        uiLfo.store(lfoValue, std::memory_order_relaxed);
     }
 
     Engine()
@@ -448,6 +491,32 @@ private:
         return std::exp2(semitones / 12.0f);
     }
 
+    /** The LFO's next value, -1..1, slightly smoothed so square and random waves don't click. */
+    float lfoStep()
+    {
+        if (params.lfoDepth <= 0.0f)
+            return lfoValue = 0.0f;
+        lfoPhase += std::clamp(params.lfoRate, 0.05f, 30.0f) / sampleRate;
+        const auto shape = static_cast<LfoShape>(std::clamp(params.lfoShape, 0, kLfoShapes - 1));
+        if (lfoPhase >= 1.0)
+        {
+            lfoPhase -= 1.0;
+            if (shape == LfoShape::Random) // only then: other shapes leave the random auto-strum untouched
+                lfoHeld = rng.next() * 2.0f - 1.0f;
+        }
+        const float p = (float) lfoPhase;
+        float raw = 0.0f;
+        switch (shape)
+        {
+            case LfoShape::Sine: raw = (float) std::sin(kTwoPi * lfoPhase); break;
+            case LfoShape::Triangle: raw = p < 0.25f ? 4.0f * p : p < 0.75f ? 2.0f - 4.0f * p : 4.0f * p - 4.0f; break;
+            case LfoShape::Square: raw = p < 0.5f ? 1.0f : -1.0f; break;
+            case LfoShape::Random: raw = lfoHeld; break;
+        }
+        lfoValue += (raw - lfoValue) * lfoSmooth;
+        return lfoValue;
+    }
+
     double sampleRate = 48000.0;
     std::array<PadVoice, 4> pads {};
     BassVoice bass;
@@ -486,8 +555,11 @@ private:
     double wowPhase = 0.0;
     float drift = 0.0f, driftTarget = 0.0f;
     int driftCountdown = 0;
+    double lfoPhase = 0.0;
+    float lfoValue = 0.0f, lfoHeld = 0.0f, lfoSmooth = 0.01f;
 
     std::atomic<int> uiHeld { -1 }, uiMemory { 0 }, uiRhythmStep { -1 };
+    std::atomic<float> uiLfo { 0.0f };
     std::array<std::atomic<float>, kStrings> uiGlow;
 };
 } // namespace sdchord

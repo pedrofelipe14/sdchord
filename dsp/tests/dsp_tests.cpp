@@ -523,6 +523,145 @@ TEST(drums_and_everything_else_stay_below_full_scale)
     }
 }
 
+// ---- LFO ---------------------------------------------------------------------------------------
+
+namespace
+{
+/** A held C major with nothing else moving the sound (no bass, wobble, chorus or reverb), and the LFO set up. */
+std::unique_ptr<Engine> lfoEngine(LfoTarget target, LfoShape shape, float rate, float depth)
+{
+    auto e = makeEngine();
+    e->params.bassLevel = 0.0f;
+    e->params.wobble = 0.0f;
+    e->params.chorus = 0.0f;
+    e->params.reverb = 0.0f;
+    e->params.lfoTarget = static_cast<int>(target);
+    e->params.lfoShape = static_cast<int>(shape);
+    e->params.lfoRate = rate;
+    e->params.lfoDepth = depth;
+    e->noteOn(noteForChord(cMajor), 1.0f);
+    return e;
+}
+
+/** Renders some seconds into separate left and right buffers. */
+void renderInto(Engine& e, double seconds, std::vector<float>& l, std::vector<float>& r)
+{
+    const int total = (int) (seconds * sampleRate);
+    l.assign((size_t) total, 0.0f);
+    r.assign((size_t) total, 0.0f);
+    for (int done = 0; done < total; done += 256)
+        e.process(l.data() + done, r.data() + done, std::min(256, total - done));
+}
+
+float rms(const std::vector<float>& x, size_t from, size_t to)
+{
+    double sum = 0.0;
+    for (size_t i = from; i < to; ++i)
+        sum += x[i] * x[i];
+    return (float) std::sqrt(sum / (double) (to - from));
+}
+
+/** The loudest and quietest 10 ms windows of a buffer. */
+std::pair<float, float> loudestAndQuietest(const std::vector<float>& x)
+{
+    const size_t w = (size_t) (0.01 * sampleRate);
+    float hi = 0.0f, lo = 1.0e9f;
+    for (size_t i = 0; i + w <= x.size(); i += w)
+    {
+        const float v = rms(x, i, i + w);
+        hi = std::max(hi, v);
+        lo = std::min(lo, v);
+    }
+    return { hi, lo };
+}
+
+int zeroCrossings(const std::vector<float>& x, size_t from, size_t to)
+{
+    int n = 0;
+    for (size_t i = from + 1; i < to; ++i)
+        n += (x[i - 1] < 0.0f) != (x[i] < 0.0f);
+    return n;
+}
+} // namespace
+
+TEST(lfo_at_zero_depth_changes_nothing)
+{
+    auto plain = makeEngine();
+    auto lfo = makeEngine();
+    lfo->params.lfoTarget = static_cast<int>(LfoTarget::Pan);
+    lfo->params.lfoShape = static_cast<int>(LfoShape::Random);
+    lfo->params.lfoRate = 7.0f;
+    for (auto* e : { plain.get(), lfo.get() })
+        e->noteOn(noteForChord(aMinor), 1.0f);
+    std::vector<float> l1, r1, l2, r2;
+    renderInto(*plain, 0.5, l1, r1);
+    renderInto(*lfo, 0.5, l2, r2);
+    CHECK(l1 == l2 && r1 == r2);
+}
+
+TEST(lfo_tremolo_pulses_the_volume)
+{
+    // Same engine with and without the LFO: window by window, the level ratio is the tremolo's gain.
+    std::vector<float> l, r, sl, sr;
+    auto still = lfoEngine(LfoTarget::Tremolo, LfoShape::Sine, 4.0f, 0.0f);
+    auto pulsing = lfoEngine(LfoTarget::Tremolo, LfoShape::Sine, 4.0f, 1.0f);
+    renderInto(*still, 1.0, sl, sr);
+    renderInto(*pulsing, 1.0, l, r);
+    const size_t w = (size_t) (0.01 * sampleRate);
+    float hi = 0.0f, lo = 1.0f;
+    for (size_t i = (size_t) (0.1 * sampleRate); i + w <= l.size(); i += w)
+    {
+        const float gain = rms(l, i, i + w) / rms(sl, i, i + w);
+        hi = std::max(hi, gain);
+        lo = std::min(lo, gain);
+    }
+    CHECK(hi > 0.95f && hi < 1.02f); // never louder than without it
+    CHECK(lo < 0.05f); // full depth dips to near silence
+}
+
+TEST(lfo_vibrato_bends_the_pitch_both_ways)
+{
+    // One plucked string under a 1 Hz square wave: 0.6 semitone up for half a second, then 0.6 down,
+    // so the zero-crossing rate of the first half is 2^(1.2/12) = 1.072 times the second's.
+    auto e = lfoEngine(LfoTarget::Vibrato, LfoShape::Square, 1.0f, 1.0f);
+    e->params.chordLevel = 0.0f;
+    e->params.stringDecay = 8.0f;
+    e->noteOn(kFirstStringNote + 4, 1.0f);
+    std::vector<float> l, r;
+    renderInto(*e, 1.0, l, r);
+    const size_t q = (size_t) (0.05 * sampleRate), half = (size_t) (0.5 * sampleRate);
+    const float ratio = (float) zeroCrossings(l, q, half - q) / (float) zeroCrossings(l, half + q, 2 * half - q);
+    CHECK(ratio > 1.05f && ratio < 1.095f);
+}
+
+TEST(lfo_filter_sweeps_the_brightness)
+{
+    // High-frequency content measured as the RMS of the sample-to-sample difference, relative to the level.
+    auto brightness = [](const std::vector<float>& x, size_t from, size_t to)
+    {
+        double diff = 0.0;
+        for (size_t i = from + 1; i < to; ++i)
+            diff += (x[i] - x[i - 1]) * (x[i] - x[i - 1]);
+        return (float) std::sqrt(diff / (double) (to - from)) / rms(x, from, to);
+    };
+    auto e = lfoEngine(LfoTarget::Filter, LfoShape::Square, 1.0f, 1.0f);
+    e->params.chordTone = 0.5f; // swept from 1 (first half) to 0 (second half)
+    std::vector<float> l, r;
+    renderInto(*e, 1.0, l, r);
+    const size_t q = (size_t) (0.05 * sampleRate), half = (size_t) (0.5 * sampleRate);
+    CHECK(brightness(l, q, half - q) > 1.5f * brightness(l, half + q, 2 * half - q));
+}
+
+TEST(lfo_pan_moves_the_sound_from_side_to_side)
+{
+    auto e = lfoEngine(LfoTarget::Pan, LfoShape::Square, 1.0f, 1.0f);
+    std::vector<float> l, r;
+    renderInto(*e, 1.0, l, r);
+    const size_t q = (size_t) (0.05 * sampleRate), half = (size_t) (0.5 * sampleRate);
+    CHECK(rms(r, q, half - q) > 10.0f * rms(l, q, half - q)); // first half: right
+    CHECK(rms(l, half + q, 2 * half - q) > 10.0f * rms(r, half + q, 2 * half - q)); // then left
+}
+
 int main()
 {
     for (const auto& t : registry())
