@@ -1,0 +1,606 @@
+/* Pedrochord in the browser: the same 1980s hardware as the plugin. Orange plastic body with dark-brown
+   silkscreen, raised cream keys with LEDs, red LED readouts, black knurled knobs, a ribbed metal plate. */
+
+:root {
+  --body-top: #f6ad62;
+  --body-bottom: #e58d3f;
+  --edge: #a85a24;
+  --print: #3a2012;
+  --print-soft: #6b3a1c;
+  --recess: #d9823a;
+  --key-top: #f6f1e6;
+  --key-bottom: #d8cfbf;
+  --key-side: #9c8f7b;
+  --led-on: #ff3b22;
+  --led-off: #5a1810;
+  --led-window: #1d0c09;
+  --plate-top: #34302b;
+  --plate-bottom: #1f1c19;
+  --ridge: #6e665d;
+  --ringing: #ece6d9;
+  --stage: #2b2420;
+  --display: 'Arial Black', 'Helvetica Neue', Arial, sans-serif;
+  --text: 'Helvetica Neue', Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(1200px 700px at 50% 0%, #3a302a, var(--stage));
+  color: var(--print);
+  font-family: var(--text);
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px 32px;
+}
+
+/* ---------- the body ---------- */
+.body {
+  position: relative;
+  width: 100%;
+  max-width: 1080px;
+  padding: 26px 36px 18px;
+  border-radius: 30px;
+  border: 1.5px solid var(--edge);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"),
+    linear-gradient(var(--body-top), var(--body-bottom));
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.55),
+    0 4px 0 rgba(0, 0, 0, 0.35),
+    0 24px 60px rgba(0, 0, 0, 0.45);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.print {
+  color: var(--print);
+  font-weight: 700;
+}
+.small {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+/* Panels moulded into the body. */
+.recess {
+  border-radius: 12px;
+  background: var(--recess);
+  border: 1px solid color-mix(in srgb, var(--edge) 60%, transparent);
+  box-shadow:
+    inset 0 8px 10px -6px rgba(0, 0, 0, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+/* ---------- header ---------- */
+.top {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.brand {
+  flex: 1;
+  min-width: 0;
+}
+.brand h1 {
+  margin: 0;
+  font: italic 900 40px/1 var(--display);
+  letter-spacing: -0.01em;
+  color: var(--print);
+}
+.subtitle {
+  margin: 6px 0 0 2px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--print-soft);
+}
+
+.stripes {
+  display: grid;
+  gap: 2px;
+  margin: 14px 0 20px;
+}
+.stripes i {
+  height: 3px;
+}
+.stripes i:nth-child(1) {
+  background: #4e2a16;
+}
+.stripes i:nth-child(2) {
+  background: #f6e7c8;
+}
+.stripes i:nth-child(3) {
+  background: #f3c24f;
+}
+
+.readout-group,
+.power {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.led-window {
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--led-window);
+  border: 4px solid var(--edge);
+  color: var(--led-on);
+  font: 700 28px/1 var(--display);
+  text-shadow: 0 0 8px rgba(255, 59, 34, 0.45);
+}
+.chord-readout {
+  width: 150px;
+  height: 54px;
+}
+.chord-readout .dim {
+  opacity: 0.55;
+  text-shadow: none;
+}
+
+.led {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--led-off);
+  box-shadow: inset 1px 1px 1px rgba(255, 255, 255, 0.25);
+}
+.led.on {
+  background: var(--led-on);
+  box-shadow:
+    0 0 6px 2px rgba(255, 59, 34, 0.45),
+    inset 1px 1px 1px rgba(255, 255, 255, 0.5);
+}
+.led.dim {
+  background: color-mix(in srgb, var(--led-on) 45%, var(--led-off));
+}
+.led.big {
+  width: 10px;
+  height: 10px;
+}
+
+.lang {
+  display: flex;
+  border-radius: 7px;
+  overflow: hidden;
+  border: 1px solid var(--edge);
+  background: var(--recess);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+.lang button {
+  padding: 5px 9px;
+  border: 0;
+  background: none;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.lang button.on {
+  background: var(--key-top);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+/* ---------- layout ---------- */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 270px;
+  gap: 26px;
+}
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+
+/* ---------- chord keys ---------- */
+.grid-panel {
+  padding: 10px 12px 14px 8px;
+}
+.chord-grid {
+  display: grid;
+  gap: 6px;
+  touch-action: none;
+}
+.chord-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.row-name {
+  width: 56px;
+  flex: none;
+  text-align: right;
+  padding-right: 4px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.key {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 54px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 6px;
+  background: linear-gradient(var(--key-top), var(--key-bottom));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    inset 0 0 0 0.8px color-mix(in srgb, var(--key-side) 80%, transparent),
+    0 5px 0 var(--key-side),
+    0 7px 4px rgba(0, 0, 0, 0.25);
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: transform 40ms, box-shadow 40ms;
+}
+.key.down {
+  transform: translateY(3.5px);
+  background: linear-gradient(var(--key-bottom), color-mix(in srgb, var(--key-bottom) 92%, #000));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 0 0 0.8px color-mix(in srgb, var(--key-side) 80%, transparent),
+    0 1.5px 0 var(--key-side),
+    0 2px 2px rgba(0, 0, 0, 0.15);
+}
+.key-label {
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* ---------- knobs ---------- */
+.knob-panel {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 14px 10px;
+  padding: 16px 18px 12px;
+}
+.knob-section h2,
+.seq-panel h2 {
+  margin: 0 0 6px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+/* Bracketed titles like a hardware front panel: └─── TITLE ───┘ upside down. */
+.bracket {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bracket::before,
+.bracket::after {
+  content: '';
+  flex: 1;
+  height: 6px;
+  border-top: 1px solid var(--print);
+}
+.bracket::before {
+  border-left: 1px solid var(--print);
+}
+.bracket::after {
+  border-right: 1px solid var(--print);
+}
+
+.knob-row {
+  display: flex;
+  gap: 4px;
+}
+.knob {
+  position: relative;
+  width: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.knob svg {
+  width: 60px;
+  height: 60px;
+  touch-action: none;
+  cursor: ns-resize;
+  outline: none;
+}
+.knob-tick {
+  stroke: var(--print);
+}
+.knob-shadow {
+  fill: rgba(0, 0, 0, 0.3);
+}
+.knob-skirt {
+  fill: #151312;
+}
+.knob-rib {
+  stroke: #3a3632;
+  stroke-width: 1;
+}
+.knob-cap {
+  fill: #262220;
+  stroke: #0d0c0b;
+  stroke-width: 0.6;
+}
+.knob-pointer {
+  stroke: #f2ede2;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+.knob-label {
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+.knob-value {
+  position: absolute;
+  bottom: calc(100% - 4px);
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: var(--led-window);
+  color: var(--led-on);
+  font: 700 12px/1 var(--display);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ---------- auto-strum ---------- */
+.seq-panel {
+  padding: 14px 18px 12px;
+}
+.seq-panel h2.wide {
+  margin-bottom: 10px;
+}
+.seq-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.key.toggle {
+  flex: none;
+  width: 72px;
+  height: 52px;
+}
+.seq-readout {
+  flex: 1;
+  min-width: 170px;
+  height: 56px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+.seq-readout .line1 {
+  font-size: 17px;
+}
+.seq-readout .line2 {
+  font-size: 13px;
+}
+.seq-readout.off {
+  color: color-mix(in srgb, var(--led-on) 45%, var(--led-window));
+  text-shadow: none;
+}
+
+/* ---------- strum plate ---------- */
+.plate-frame {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px 10px;
+  border-radius: 16px;
+  background: var(--recess);
+  border: 1px solid color-mix(in srgb, var(--edge) 60%, transparent);
+  box-shadow:
+    inset 0 8px 10px -6px rgba(0, 0, 0, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.45);
+}
+.plate-title,
+.plate-hint {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+.plate-hint {
+  font-weight: 600;
+  color: var(--print-soft);
+}
+.plate {
+  position: relative;
+  flex: 1;
+  min-height: 420px;
+  margin: 10px 0;
+  border-radius: 8px;
+  border: 3px solid #6f685f;
+  background: linear-gradient(var(--plate-top), var(--plate-bottom));
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+  touch-action: none;
+  cursor: pointer;
+}
+/* A string is a ridge pressed into the metal: dark groove above, a highlight below that catches more
+   light while it rings. */
+.string {
+  --ridge-colour: color-mix(in srgb, var(--ringing) calc(var(--ring) * 85%), var(--ridge));
+  position: absolute;
+  left: 34px;
+  right: 12px;
+  height: 3px;
+  transform: translateY(50%);
+  background: linear-gradient(rgba(0, 0, 0, 0.6) 0 2px, var(--ridge-colour) 2px);
+  pointer-events: none;
+}
+.string-note {
+  position: absolute;
+  right: calc(100% + 6px);
+  top: -6px;
+  font-size: 10px;
+  color: #a79f92;
+}
+.plate-frame.wide .plate {
+  flex: none; /* a fixed height: flex: 1 would collapse it in the column layout */
+  min-height: 0;
+  height: 170px;
+}
+.plate-frame.wide .string {
+  left: auto;
+  right: auto;
+  top: 8px;
+  bottom: 22px;
+  width: 3px;
+  height: auto;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.6) 0 2px, var(--ridge-colour) 2px);
+}
+.plate-frame.wide .string-note {
+  right: auto;
+  top: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* ---------- text ---------- */
+.start-hint {
+  margin: -12px 0 -8px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--print-soft);
+  animation: blink 1.4s ease-in-out infinite alternate;
+}
+@keyframes blink {
+  to {
+    opacity: 0.4;
+  }
+}
+.help {
+  margin-top: 16px;
+  font-size: 11px;
+  color: var(--print-soft);
+}
+.help p {
+  margin: 3px 0;
+}
+.about {
+  margin: 18px 0 0;
+  font-size: 12px;
+  color: #b9a99a;
+  text-align: center;
+}
+.about a {
+  color: var(--body-top);
+}
+
+/* ---------- phones and narrow windows ---------- */
+@media (max-width: 860px) {
+  .stage {
+    padding: 10px 8px 24px;
+  }
+  .body {
+    padding: 16px 12px 14px;
+    border-radius: 20px;
+  }
+  .top {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .brand {
+    flex-basis: 100%;
+  }
+  .brand h1 {
+    font-size: 30px;
+  }
+  .subtitle {
+    font-size: 9.5px;
+  }
+  .chord-readout {
+    width: 104px;
+    height: 44px;
+    font-size: 21px;
+  }
+  .power {
+    display: none;
+  }
+  .stripes {
+    margin: 10px 0 14px;
+  }
+  /* Keys, then the plate (wide), then the panels. */
+  .layout {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .controls {
+    display: contents;
+  }
+  .grid-panel {
+    order: 1;
+    padding: 8px 6px 10px 4px;
+  }
+  .start-hint {
+    order: 2;
+    margin: -6px 0;
+  }
+  .plate-frame {
+    order: 3;
+  }
+  .knob-panel {
+    order: 4;
+    justify-content: center;
+  }
+  .seq-panel {
+    order: 5;
+  }
+  .chord-row {
+    gap: 3px;
+  }
+  .row-name {
+    width: 30px;
+    font-size: 8.5px;
+    padding-right: 2px;
+  }
+  .key {
+    height: 44px;
+    border-radius: 4px;
+    gap: 3px;
+  }
+  .key-label {
+    font-size: 11px;
+  }
+  .key-label .suffix {
+    display: none;
+  }
+  .led {
+    width: 5px;
+    height: 5px;
+  }
+  .seq-row {
+    justify-content: center;
+  }
+  .help {
+    display: none; /* keyboard and MIDI help means little on a phone */
+  }
+}
