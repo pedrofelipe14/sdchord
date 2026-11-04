@@ -10,6 +10,7 @@
 ![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white)
 ![JUCE](https://img.shields.io/badge/JUCE-9-8DC63F)
 ![VST3](https://img.shields.io/badge/VST3-Standalone-555)
+![pluginval](https://img.shields.io/badge/pluginval-strictness_10-2ea44f)
 
 ![Rasguido tocando La menor 7 después de un rasgueo](docs/screenshot.png)
 
@@ -48,6 +49,7 @@ tools/    un renderizador fuera de pantalla que saca la captura de arriba
 - **La interfaz también toca por MIDI.** Los botones y la franja mandan los mismos mensajes de nota que mandaría un DAW, por una cola segura entre hilos. Así, mouse, touch y MIDI comparten un solo camino de código, y los tests lo cubren.
 - **Precisión de muestra.** El procesador renderiza hasta cada evento MIDI y recién ahí lo aplica, así que un rasgueo mantiene su tiempo dentro de un bloque.
 - **Nada reserva memoria en el hilo de audio.** Las líneas de delay son arrays de tamaño fijo, y la interfaz lee el estado del motor (acorde apretado, brillo de cada cuerda) desde atomics.
+- **Validado como lo cargaría un DAW:** el CI corre [pluginval](https://github.com/Tracktion/pluginval) en su nivel más estricto (10) en cada push: distintos sample rates y tamaños de bloque, guardar y restaurar estado, automatización, valores aleatorios en los parámetros y abrir el editor mientras procesa audio.
 - **Testeado sin DAW:** los voicings, el mapeo MIDI, la pila de acordes, que un rasgueo pulse las cuerdas correctas, que el decay no dependa del sample rate, y una prueba de estrés con todo al máximo que no da valores inválidos ni llega a saturar.
 
 ## Compilar

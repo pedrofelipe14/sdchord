@@ -10,6 +10,7 @@
 ![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white)
 ![JUCE](https://img.shields.io/badge/JUCE-9-8DC63F)
 ![VST3](https://img.shields.io/badge/VST3-Standalone-555)
+![pluginval](https://img.shields.io/badge/pluginval-strictness_10-2ea44f)
 
 ![Rasguido playing A minor 7 after a strum](docs/screenshot.png)
 
@@ -48,6 +49,7 @@ tools/    an off-screen renderer that takes the screenshot above
 - **The UI plays through MIDI too.** Chord buttons and the strum plate send the same note messages a DAW would, through a thread-safe queue. So mouse, touch and MIDI share a single code path, and the tests exercise it.
 - **Sample-accurate.** The processor renders up to each MIDI event and then applies it, so a strum keeps its timing inside a block.
 - **Nothing allocates on the audio thread.** Delay lines are fixed-size arrays, and the UI reads the engine's state (held chord, string glow) from atomics.
+- **Validated like a DAW would load it:** CI runs [pluginval](https://github.com/Tracktion/pluginval) at its strictest level (10) on every push: different sample rates and block sizes, state save and restore, automation, parameter fuzzing, and opening the editor while audio runs.
 - **Tested without a DAW:** chord voicings, the MIDI layout, the held-chord stack, strums crossing the right strings, decay times that don't depend on the sample rate, and a stress test with everything at maximum that stays finite and below full scale.
 
 ## Building
