@@ -2,12 +2,12 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
-#include "rasguido/engine.h"
+#include "pedrochord/engine.h"
 
-class RasguidoProcessor : public juce::AudioProcessor
+class PedrochordProcessor : public juce::AudioProcessor
 {
 public:
-    RasguidoProcessor();
+    PedrochordProcessor();
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
@@ -35,7 +35,7 @@ public:
         thread only; the audio thread applies it at the start of its next block. */
     void playFromUi(const juce::MidiMessage& message);
 
-    const rasguido::Engine& engine() const { return dsp; }
+    const pedrochord::Engine& engine() const { return dsp; }
 
     juce::AudioProcessorValueTreeState state;
 
@@ -44,7 +44,7 @@ private:
     void handle(const juce::MidiMessage& message);
     void readParams();
 
-    rasguido::Engine dsp;
+    pedrochord::Engine dsp;
     // Lock-free queue from the editor to the audio thread. (A MidiMessageCollector would keep the
     // events' relative timing, but always at the cost of one extra block of latency.)
     struct UiEvent
@@ -55,5 +55,5 @@ private:
     juce::AbstractFifo uiFifo { uiQueueSize };
     std::array<UiEvent, uiQueueSize> uiEvents {};
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RasguidoProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PedrochordProcessor)
 };

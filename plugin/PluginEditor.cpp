@@ -69,14 +69,14 @@ void drawLed(juce::Graphics& g, juce::Point<float> c, float radius, float level)
 
 // ---- look and feel -----------------------------------------------------------------------------
 
-RasguidoLook::RasguidoLook()
+PedrochordLook::PedrochordLook()
 {
     setColour(juce::BubbleComponent::backgroundColourId, Colours::ledWindow);
     setColour(juce::BubbleComponent::outlineColourId, Colours::print);
     setColour(juce::TooltipWindow::textColourId, Colours::ledOn);
 }
 
-void RasguidoLook::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h, float pos, float start, float end, juce::Slider&)
+void PedrochordLook::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h, float pos, float start, float end, juce::Slider&)
 {
     const auto area = juce::Rectangle<int>(x, y, w, h).toFloat();
     const float radius = juce::jmin(area.getWidth(), area.getHeight()) * 0.5f;
@@ -119,7 +119,7 @@ void RasguidoLook::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int 
 juce::Rectangle<float> ChordGrid::cellBounds(int root, int type) const
 {
     const float w = ((float) getWidth() - labelWidth) / 12.0f;
-    const float h = (float) getHeight() / (float) rasguido::kChordTypes;
+    const float h = (float) getHeight() / (float) pedrochord::kChordTypes;
     return { labelWidth + w * (float) root, h * (float) type, w, h };
 }
 
@@ -128,7 +128,7 @@ int ChordGrid::codeAt(juce::Point<float> p) const
     if (p.x < labelWidth || !getLocalBounds().toFloat().contains(p))
         return -1;
     const int root = juce::jlimit(0, 11, (int) ((p.x - labelWidth) / (((float) getWidth() - labelWidth) / 12.0f)));
-    const int type = juce::jlimit(0, rasguido::kChordTypes - 1, (int) (p.y / ((float) getHeight() / rasguido::kChordTypes)));
+    const int type = juce::jlimit(0, pedrochord::kChordTypes - 1, (int) (p.y / ((float) getHeight() / pedrochord::kChordTypes)));
     return root + 12 * type;
 }
 
@@ -136,7 +136,7 @@ void ChordGrid::paint(juce::Graphics& g)
 {
     drawRecess(g, getLocalBounds().toFloat().withTrimmedLeft(labelWidth - 8.0f), 10.0f);
 
-    for (int type = 0; type < rasguido::kChordTypes; ++type)
+    for (int type = 0; type < pedrochord::kChordTypes; ++type)
     {
         const auto row = cellBounds(0, type);
         g.setColour(Colours::print);
@@ -181,13 +181,13 @@ void ChordGrid::press(int source, int code)
     {
         if (it->second == code)
             return;
-        processor.playFromUi(noteOff(rasguido::kFirstChordNote + it->second));
+        processor.playFromUi(noteOff(pedrochord::kFirstChordNote + it->second));
         pressed.erase(it);
     }
     if (code >= 0)
     {
         pressed[source] = code;
-        processor.playFromUi(noteOn(rasguido::kFirstChordNote + code, 1.0f));
+        processor.playFromUi(noteOn(pedrochord::kFirstChordNote + code, 1.0f));
     }
 }
 
@@ -195,7 +195,7 @@ void ChordGrid::release(int source)
 {
     if (auto it = pressed.find(source); it != pressed.end())
     {
-        processor.playFromUi(noteOff(rasguido::kFirstChordNote + it->second));
+        processor.playFromUi(noteOff(pedrochord::kFirstChordNote + it->second));
         pressed.erase(it);
     }
 }
@@ -230,14 +230,14 @@ float StrumPlate::positionAt(float y) const
 
 void StrumPlate::pluck(int string, float velocity)
 {
-    processor.playFromUi(noteOn(rasguido::noteForString(string), velocity));
+    processor.playFromUi(noteOn(pedrochord::noteForString(string), velocity));
 }
 
 void StrumPlate::mouseDown(const juce::MouseEvent& e)
 {
     const float p = positionAt(e.position.y);
     fingers[e.source.getIndex()] = { p, juce::Time::getMillisecondCounterHiRes() };
-    pluck(juce::jlimit(0, rasguido::kStrings - 1, (int) (p * rasguido::kStrings)), 0.75f);
+    pluck(juce::jlimit(0, pedrochord::kStrings - 1, (int) (p * pedrochord::kStrings)), 0.75f);
 }
 
 void StrumPlate::mouseDrag(const juce::MouseEvent& e)
@@ -255,9 +255,9 @@ void StrumPlate::mouseDrag(const juce::MouseEvent& e)
     const float velocity = juce::jlimit(0.3f, 1.0f, 0.35f + speed * 0.12f);
 
     const float lo = juce::jmin(finger.position, p), hi = juce::jmax(finger.position, p);
-    for (int s = 0; s < rasguido::kStrings; ++s)
+    for (int s = 0; s < pedrochord::kStrings; ++s)
     {
-        const float centre = ((float) s + 0.5f) / (float) rasguido::kStrings;
+        const float centre = ((float) s + 0.5f) / (float) pedrochord::kStrings;
         if (centre > lo && centre <= hi)
             pluck(s, velocity);
     }
@@ -271,7 +271,7 @@ void StrumPlate::refresh()
     const auto& engine = processor.engine();
     bool changed = engine.stringChordCode() != chordCode;
     chordCode = engine.stringChordCode();
-    for (int s = 0; s < rasguido::kStrings; ++s)
+    for (int s = 0; s < pedrochord::kStrings; ++s)
     {
         const float level = engine.stringGlow(s);
         changed = changed || std::abs(level - glow[(size_t) s]) > 0.003f;
@@ -303,11 +303,11 @@ void StrumPlate::paint(juce::Graphics& g)
     g.fillRoundedRectangle(plate, 7.0f);
 
     const auto area = stringArea();
-    const float gap = area.getHeight() / (float) rasguido::kStrings;
+    const float gap = area.getHeight() / (float) pedrochord::kStrings;
     const int code = juce::jmax(0, chordCode);
-    const auto notes = rasguido::stringNotes({ code % 12, static_cast<rasguido::ChordType>(code / 12) });
+    const auto notes = pedrochord::stringNotes({ code % 12, static_cast<pedrochord::ChordType>(code / 12) });
 
-    for (int s = 0; s < rasguido::kStrings; ++s)
+    for (int s = 0; s < pedrochord::kStrings; ++s)
     {
         const float y = area.getBottom() - gap * ((float) s + 0.5f);
         const float level = juce::jlimit(0.0f, 1.0f, glow[(size_t) s] * 1.6f);
@@ -327,7 +327,7 @@ void StrumPlate::paint(juce::Graphics& g)
 
 // ---- editor ------------------------------------------------------------------------------------
 
-RasguidoEditor::RasguidoEditor(RasguidoProcessor& p) : AudioProcessorEditor(&p), processor(p), grid(p), plate(p)
+PedrochordEditor::PedrochordEditor(PedrochordProcessor& p) : AudioProcessorEditor(&p), processor(p), grid(p), plate(p)
 {
     setLookAndFeel(&look);
 
@@ -362,12 +362,12 @@ RasguidoEditor::RasguidoEditor(RasguidoProcessor& p) : AudioProcessorEditor(&p),
     keyPoller.startTimer(4);
 }
 
-RasguidoEditor::~RasguidoEditor()
+PedrochordEditor::~PedrochordEditor()
 {
     keyPoller.stopTimer();
     for (size_t code = 0; code < keysDown.size(); ++code)
         if (keysDown[code])
-            processor.playFromUi(noteOff(rasguido::kFirstChordNote + (int) code));
+            processor.playFromUi(noteOff(pedrochord::kFirstChordNote + (int) code));
     setLookAndFeel(nullptr);
 }
 
@@ -379,9 +379,9 @@ using KeyRow = std::array<juce::juce_wchar, 12>;
 
 /** One row per chord type, twelve keys from C to B, laid out for a Latin American keyboard (letters and
     digits work on any layout). The bottom row only has ten keys, so it stops at A minor 7 (0 = no key). */
-const std::array<KeyRow, rasguido::kChordTypes>& keyRows()
+const std::array<KeyRow, pedrochord::kChordTypes>& keyRows()
 {
-    static const std::array<KeyRow, rasguido::kChordTypes> rows {
+    static const std::array<KeyRow, pedrochord::kChordTypes> rows {
         KeyRow { '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '\'', 0xbf }, // ... 0 ' ¿
         KeyRow { 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', 0xb4, '+' }, //  ... p ´ +
         KeyRow { 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 0xf1, '{', '}' }, //  ... l ñ { }
@@ -400,19 +400,19 @@ bool isMappedKey(juce::juce_wchar c)
 }
 } // namespace
 
-bool RasguidoEditor::keyPressed(const juce::KeyPress& key)
+bool PedrochordEditor::keyPressed(const juce::KeyPress& key)
 {
     // Swallow mapped keys (auto-repeat included) so the host doesn't act on them too.
     return !key.getModifiers().isCommandDown() && isMappedKey(key.getTextCharacter());
 }
 
-bool RasguidoEditor::keyStateChanged(bool)
+bool PedrochordEditor::keyStateChanged(bool)
 {
     pollKeys(); // react to the event right away; the poller covers anything the events miss
     return std::any_of(keysDown.begin(), keysDown.end(), [](bool down) { return down; });
 }
 
-void RasguidoEditor::pollKeys()
+void PedrochordEditor::pollKeys()
 {
     // Only while this editor has the keyboard: typing elsewhere must not play, and losing focus with
     // keys held lets them go. Ctrl/Alt shortcuts (Ctrl+S in a DAW...) never play chords.
@@ -420,7 +420,7 @@ void RasguidoEditor::pollKeys()
     const bool active = isShowing() && hasKeyboardFocus(true) && !mods.isCommandDown() && !mods.isAltDown();
 
     const auto& rows = keyRows();
-    for (int type = 0; type < rasguido::kChordTypes; ++type)
+    for (int type = 0; type < pedrochord::kChordTypes; ++type)
     {
         for (int root = 0; root < 12; ++root)
         {
@@ -432,12 +432,12 @@ void RasguidoEditor::pollKeys()
             if (down == keysDown[(size_t) code])
                 continue;
             keysDown[(size_t) code] = down;
-            processor.playFromUi(down ? noteOn(rasguido::kFirstChordNote + code, 1.0f) : noteOff(rasguido::kFirstChordNote + code));
+            processor.playFromUi(down ? noteOn(pedrochord::kFirstChordNote + code, 1.0f) : noteOff(pedrochord::kFirstChordNote + code));
         }
     }
 }
 
-void RasguidoEditor::refreshFromEngine()
+void PedrochordEditor::refreshFromEngine()
 {
     // Take keyboard focus once the window is up, so typing plays chords straight away.
     if (!focusGrabbed && isShowing())
@@ -458,7 +458,7 @@ void RasguidoEditor::refreshFromEngine()
     }
 }
 
-void RasguidoEditor::paint(juce::Graphics& g)
+void PedrochordEditor::paint(juce::Graphics& g)
 {
     // Behind the instrument, then the body itself with a soft highlight along the top.
     g.fillAll(juce::Colour(0xff2b2420));
@@ -484,7 +484,7 @@ void RasguidoEditor::paint(juce::Graphics& g)
     const float left = 44.0f;
     g.setColour(Colours::print);
     g.setFont(font(34.0f, "Bold Italic"));
-    g.drawText("Rasguido", juce::Rectangle<float>(left, 22, 240, 44), juce::Justification::centredLeft);
+    g.drawText("Pedrochord", juce::Rectangle<float>(left, 22, 240, 44), juce::Justification::centredLeft);
     g.setFont(font(11.5f, "Bold"));
     g.setColour(Colours::printSoft);
     g.drawText(juce::String::fromUTF8("ARPA ELECTR\xc3\x93NICA DE ACORDES"), juce::Rectangle<float>(left + 2, 64, 300, 16), juce::Justification::centredLeft);
@@ -556,7 +556,7 @@ void RasguidoEditor::paint(juce::Graphics& g)
                juce::Rectangle<float>(left, (float) getHeight() - 36, 640, 16), juce::Justification::centredLeft);
 }
 
-void RasguidoEditor::resized()
+void PedrochordEditor::resized()
 {
     plate.setBounds(getWidth() - 318, 28, 284, getHeight() - 56);
     const int left = 44, right = plate.getX() - 30;

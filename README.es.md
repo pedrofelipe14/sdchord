@@ -1,18 +1,18 @@
 <div align="center">
 
-# Rasguido
+# Pedrochord
 
-**Un instrumento electrónico estilo autoarpa en formato VST3: mantenés un botón de acorde, rasgueás la franja y cada cuerda toca una nota de ese acorde.**
+**Un instrumento electrónico estilo omnichord en formato VST3: mantenés un botón de acorde, rasgueás la franja y cada cuerda toca una nota de ese acorde.**
 
 [English](README.md) · **Español**
 
-[![Build](https://github.com/pedrofelipe14/rasguido/actions/workflows/build.yml/badge.svg)](https://github.com/pedrofelipe14/rasguido/actions/workflows/build.yml)
+[![Build](https://github.com/pedrofelipe14/pedrochord/actions/workflows/build.yml/badge.svg)](https://github.com/pedrofelipe14/pedrochord/actions/workflows/build.yml)
 ![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white)
 ![JUCE](https://img.shields.io/badge/JUCE-9-8DC63F)
 ![VST3](https://img.shields.io/badge/VST3-Standalone-555)
 ![pluginval](https://img.shields.io/badge/pluginval-strictness_10-2ea44f)
 
-![Rasguido tocando La menor 7 después de un rasgueo](docs/screenshot.png)
+![Pedrochord tocando La menor 7 después de un rasgueo](docs/screenshot.png)
 
 </div>
 
@@ -37,10 +37,10 @@
 
 ```
 dsp/      el instrumento: C++17 header-only, sin JUCE (también va a compilar a WebAssembly)
-  include/rasguido/chords.h    acordes, voicings y el mapeo MIDI
-  include/rasguido/voices.h    voces de colchón, bajo y cuerdas FM
-  include/rasguido/effects.h   chorus y una reverb chica estilo Freeverb
-  include/rasguido/engine.h    pila de acordes apretados, lógica de rasgueo y mezcla
+  include/pedrochord/chords.h    acordes, voicings y el mapeo MIDI
+  include/pedrochord/voices.h    voces de colchón, bajo y cuerdas FM
+  include/pedrochord/effects.h   chorus y una reverb chica estilo Freeverb
+  include/pedrochord/engine.h    pila de acordes apretados, lógica de rasgueo y mezcla
   tests/                       16 tests nativos
 plugin/   la capa JUCE y el editor, dibujado como hardware de los 80 (cuerpo crema, display de LEDs, placa ranurada)
 tools/    un renderizador fuera de pantalla que saca la captura de arriba
@@ -57,9 +57,9 @@ tools/    un renderizador fuera de pantalla que saca la captura de arriba
 Hace falta CMake 3.22+ y Visual Studio 2022 (u otro compilador C++17). JUCE es un submódulo.
 
 ```sh
-git clone --recursive https://github.com/pedrofelipe14/rasguido.git
+git clone --recursive https://github.com/pedrofelipe14/pedrochord.git
 cmake -B build
-cmake --build build --config Release --target Rasguido_All
+cmake --build build --config Release --target Pedrochord_All
 # Solo los tests del DSP:
 cmake -S dsp -B dsp/build && cmake --build dsp/build --config Release && dsp/build/Release/dsp_tests
 ```

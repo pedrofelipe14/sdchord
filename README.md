@@ -1,18 +1,18 @@
 <div align="center">
 
-# Rasguido
+# Pedrochord
 
-**An autoharp-style electronic instrument as a VST3 plugin: hold a chord button, strum the plate, and every string plays a note of that chord.**
+**An omnichord-style electronic instrument as a VST3 plugin: hold a chord button, strum the plate, and every string plays a note of that chord.**
 
 **English** · [Español](README.es.md)
 
-[![Build](https://github.com/pedrofelipe14/rasguido/actions/workflows/build.yml/badge.svg)](https://github.com/pedrofelipe14/rasguido/actions/workflows/build.yml)
+[![Build](https://github.com/pedrofelipe14/pedrochord/actions/workflows/build.yml/badge.svg)](https://github.com/pedrofelipe14/pedrochord/actions/workflows/build.yml)
 ![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white)
 ![JUCE](https://img.shields.io/badge/JUCE-9-8DC63F)
 ![VST3](https://img.shields.io/badge/VST3-Standalone-555)
 ![pluginval](https://img.shields.io/badge/pluginval-strictness_10-2ea44f)
 
-![Rasguido playing A minor 7 after a strum](docs/screenshot.png)
+![Pedrochord playing A minor 7 after a strum](docs/screenshot.png)
 
 </div>
 
@@ -37,10 +37,10 @@
 
 ```
 dsp/      the instrument: header-only C++17, no JUCE (it will also compile to WebAssembly)
-  include/rasguido/chords.h    chords, voicings, the MIDI layout
-  include/rasguido/voices.h    pad, bass and FM string voices
-  include/rasguido/effects.h   chorus and a small Freeverb-style reverb
-  include/rasguido/engine.h    held-chord stack, strum logic, mixing
+  include/pedrochord/chords.h    chords, voicings, the MIDI layout
+  include/pedrochord/voices.h    pad, bass and FM string voices
+  include/pedrochord/effects.h   chorus and a small Freeverb-style reverb
+  include/pedrochord/engine.h    held-chord stack, strum logic, mixing
   tests/                       16 native tests
 plugin/   JUCE wrapper and the editor, drawn as 1980s hardware (cream body, LED readout, ribbed plate)
 tools/    an off-screen renderer that takes the screenshot above
@@ -57,9 +57,9 @@ tools/    an off-screen renderer that takes the screenshot above
 Needs CMake 3.22+ and Visual Studio 2022 (or another C++17 compiler). JUCE is a submodule.
 
 ```sh
-git clone --recursive https://github.com/pedrofelipe14/rasguido.git
+git clone --recursive https://github.com/pedrofelipe14/pedrochord.git
 cmake -B build
-cmake --build build --config Release --target Rasguido_All
+cmake --build build --config Release --target Pedrochord_All
 # DSP tests only:
 cmake -S dsp -B dsp/build && cmake --build dsp/build --config Release && dsp/build/Release/dsp_tests
 ```

@@ -6,7 +6,7 @@
 #include <cmath>
 #include <cstdint>
 
-namespace rasguido
+namespace pedrochord
 {
 constexpr double kTwoPi = 6.283185307179586;
 
@@ -203,4 +203,4 @@ private:
     int attackLeft = 0;
     bool sounding = false;
 };
-} // namespace rasguido
+} // namespace pedrochord

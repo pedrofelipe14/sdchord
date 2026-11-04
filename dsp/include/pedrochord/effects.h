@@ -8,7 +8,7 @@
 
 #include "voices.h"
 
-namespace rasguido
+namespace pedrochord
 {
 /** Two modulated delay taps, a quarter cycle apart: one per side. */
 class Chorus
@@ -150,4 +150,4 @@ private:
     std::array<std::array<Comb, 4>, 2> combs {};
     std::array<std::array<Allpass, 2>, 2> allpasses {};
 };
-} // namespace rasguido
+} // namespace pedrochord

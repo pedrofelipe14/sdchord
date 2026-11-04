@@ -13,7 +13,7 @@
 #include "effects.h"
 #include "voices.h"
 
-namespace rasguido
+namespace pedrochord
 {
 struct Params
 {
@@ -282,4 +282,4 @@ private:
     std::atomic<int> uiHeld { -1 }, uiMemory { 0 };
     std::array<std::atomic<float>, kStrings> uiGlow;
 };
-} // namespace rasguido
+} // namespace pedrochord

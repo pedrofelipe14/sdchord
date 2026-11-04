@@ -7,10 +7,10 @@
 #include "PluginProcessor.h"
 
 /** Knobs with a value arc in the colour of their section. */
-class RasguidoLook : public juce::LookAndFeel_V4
+class PedrochordLook : public juce::LookAndFeel_V4
 {
 public:
-    RasguidoLook();
+    PedrochordLook();
     void drawRotarySlider(juce::Graphics&, int x, int y, int w, int h, float pos, float start, float end, juce::Slider&) override;
 };
 
@@ -18,7 +18,7 @@ public:
 class ChordGrid : public juce::Component
 {
 public:
-    explicit ChordGrid(RasguidoProcessor& p) : processor(p) {}
+    explicit ChordGrid(PedrochordProcessor& p) : processor(p) {}
 
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
@@ -35,7 +35,7 @@ private:
     void press(int source, int code);
     void release(int source);
 
-    RasguidoProcessor& processor;
+    PedrochordProcessor& processor;
     std::map<int, int> pressed; // mouse/touch source -> chord code
     int held = -1, memory = 0;
 };
@@ -44,7 +44,7 @@ private:
 class StrumPlate : public juce::Component
 {
 public:
-    explicit StrumPlate(RasguidoProcessor& p) : processor(p) {}
+    explicit StrumPlate(PedrochordProcessor& p) : processor(p) {}
 
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
@@ -59,22 +59,22 @@ private:
     float positionAt(float y) const; // 0 = bottom string, 1 = top
     void pluck(int string, float velocity);
 
-    RasguidoProcessor& processor;
+    PedrochordProcessor& processor;
     struct Finger
     {
         float position;
         double time;
     };
     std::map<int, Finger> fingers;
-    std::array<float, rasguido::kStrings> glow {};
+    std::array<float, pedrochord::kStrings> glow {};
     int chordCode = -1;
 };
 
-class RasguidoEditor : public juce::AudioProcessorEditor, private juce::Timer
+class PedrochordEditor : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
-    explicit RasguidoEditor(RasguidoProcessor&);
-    ~RasguidoEditor() override;
+    explicit PedrochordEditor(PedrochordProcessor&);
+    ~PedrochordEditor() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -95,7 +95,7 @@ private:
         which left chords stuck; polling the real state means a release can never be lost. */
     void pollKeys();
 
-    std::array<bool, 12 * rasguido::kChordTypes> keysDown {};
+    std::array<bool, 12 * pedrochord::kChordTypes> keysDown {};
     juce::TimedCallback keyPoller { [this] { pollKeys(); } };
     bool focusGrabbed = false;
 
@@ -113,13 +113,13 @@ private:
         int first, count;
     };
 
-    RasguidoProcessor& processor;
-    RasguidoLook look;
+    PedrochordProcessor& processor;
+    PedrochordLook look;
     ChordGrid grid;
     StrumPlate plate;
     std::array<Knob, 10> knobs;
     std::vector<Section> sections;
     int shownHeld = -2, shownMemory = -2;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RasguidoEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PedrochordEditor)
 };

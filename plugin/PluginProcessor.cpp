@@ -12,16 +12,16 @@ juce::NormalisableRange<float> range(float lo, float hi, float centre = -1.0f)
 }
 } // namespace
 
-RasguidoProcessor::RasguidoProcessor()
+PedrochordProcessor::PedrochordProcessor()
     : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      state(*this, nullptr, "Rasguido", createLayout())
+      state(*this, nullptr, "Pedrochord", createLayout())
 {
 }
 
-juce::AudioProcessorValueTreeState::ParameterLayout RasguidoProcessor::createLayout()
+juce::AudioProcessorValueTreeState::ParameterLayout PedrochordProcessor::createLayout()
 {
     using P = juce::AudioParameterFloat;
-    const rasguido::Params d;
+    const pedrochord::Params d;
     auto pct = [](const juce::String& id, const juce::String& name, float def)
     {
         return std::make_unique<P>(juce::ParameterID { id, 1 }, name, range(0.0f, 1.0f), def,
@@ -45,17 +45,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout RasguidoProcessor::createLay
     return layout;
 }
 
-void RasguidoProcessor::prepareToPlay(double sampleRate, int)
+void PedrochordProcessor::prepareToPlay(double sampleRate, int)
 {
     dsp.prepare(sampleRate);
 }
 
-bool RasguidoProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+bool PedrochordProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
     return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
 }
 
-void RasguidoProcessor::readParams()
+void PedrochordProcessor::readParams()
 {
     auto get = [this](const char* id) { return state.getRawParameterValue(id)->load(); };
     auto& p = dsp.params;
@@ -71,7 +71,7 @@ void RasguidoProcessor::readParams()
     p.master = get("master");
 }
 
-void RasguidoProcessor::handle(const juce::MidiMessage& m)
+void PedrochordProcessor::handle(const juce::MidiMessage& m)
 {
     if (m.isNoteOn())
         dsp.noteOn(m.getNoteNumber(), m.getFloatVelocity());
@@ -83,7 +83,7 @@ void RasguidoProcessor::handle(const juce::MidiMessage& m)
         dsp.allNotesOff();
 }
 
-void RasguidoProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
+void PedrochordProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
     juce::ScopedNoDenormals noDenormals;
     const int numSamples = buffer.getNumSamples();
@@ -110,7 +110,7 @@ void RasguidoProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mid
         dsp.process(left + done, right + done, numSamples - done);
 }
 
-void RasguidoProcessor::playFromUi(const juce::MidiMessage& message)
+void PedrochordProcessor::playFromUi(const juce::MidiMessage& message)
 {
     if (message.getRawDataSize() != 3)
         return;
@@ -119,19 +119,19 @@ void RasguidoProcessor::playFromUi(const juce::MidiMessage& message)
     uiFifo.write(1).forEach([&](int i) { uiEvents[(size_t) i] = event; }); // dropped only if 1024 are already waiting
 }
 
-juce::AudioProcessorEditor* RasguidoProcessor::createEditor() { return new RasguidoEditor(*this); }
+juce::AudioProcessorEditor* PedrochordProcessor::createEditor() { return new PedrochordEditor(*this); }
 
-void RasguidoProcessor::getStateInformation(juce::MemoryBlock& destData)
+void PedrochordProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     if (auto xml = state.copyState().createXml())
         copyXmlToBinary(*xml, destData);
 }
 
-void RasguidoProcessor::setStateInformation(const void* data, int sizeInBytes)
+void PedrochordProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
         if (xml->hasTagName(state.state.getType()))
             state.replaceState(juce::ValueTree::fromXml(*xml));
 }
 
-juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new RasguidoProcessor(); }
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new PedrochordProcessor(); }
