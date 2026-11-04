@@ -85,13 +85,18 @@ public:
     // Computer keyboard: each row of keys is one chord type, left to right from C.
     bool keyPressed(const juce::KeyPress&) override;
     bool keyStateChanged(bool isKeyDown) override;
-    void focusLost(FocusChangeType) override { releaseKeys(); }
+    void focusLost(FocusChangeType) override { pollKeys(); }
 
 private:
     void timerCallback() override { refreshFromEngine(); }
-    void releaseKeys();
+
+    /** Reads the physical state of every mapped key and sends the presses and releases that changed.
+        Key events alone can be late or go missing (focus moving, dead keys, several keys at once),
+        which left chords stuck; polling the real state means a release can never be lost. */
+    void pollKeys();
 
     std::array<bool, 12 * rasguido::kChordTypes> keysDown {};
+    juce::TimedCallback keyPoller { [this] { pollKeys(); } };
     bool focusGrabbed = false;
 
     struct Knob

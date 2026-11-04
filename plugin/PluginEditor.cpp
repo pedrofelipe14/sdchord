@@ -359,11 +359,15 @@ RasguidoEditor::RasguidoEditor(RasguidoProcessor& p) : AudioProcessorEditor(&p),
     setWantsKeyboardFocus(true);
     setSize(1060, 620);
     startTimerHz(40);
+    keyPoller.startTimer(4);
 }
 
 RasguidoEditor::~RasguidoEditor()
 {
-    releaseKeys();
+    keyPoller.stopTimer();
+    for (size_t code = 0; code < keysDown.size(); ++code)
+        if (keysDown[code])
+            processor.playFromUi(noteOff(rasguido::kFirstChordNote + (int) code));
     setLookAndFeel(nullptr);
 }
 
@@ -371,66 +375,66 @@ RasguidoEditor::~RasguidoEditor()
 
 namespace
 {
-// One row per chord type, twelve keys from C to B, laid out for a Latin American keyboard (letters and
-// digits work on any layout). The bottom row only has ten keys, so it stops at A minor 7.
-const char* const keyRows[rasguido::kChordTypes] = {
-    "1234567890'\xc2\xbf", // major: ... 0 ' ¿
-    "qwertyuiop\xc2\xb4+", // minor: ... p ´ +
-    "asdfghjkl\xc3\xb1{}", // seventh: ... l ñ { }
-    "zxcvbnm,.-", // minor seventh
-};
+using KeyRow = std::array<juce::juce_wchar, 12>;
 
-/** The characters of a row, decoded from UTF-8. */
-juce::Array<juce::juce_wchar> rowKeys(int type)
+/** One row per chord type, twelve keys from C to B, laid out for a Latin American keyboard (letters and
+    digits work on any layout). The bottom row only has ten keys, so it stops at A minor 7 (0 = no key). */
+const std::array<KeyRow, rasguido::kChordTypes>& keyRows()
 {
-    juce::Array<juce::juce_wchar> keys;
-    for (auto t = juce::String::fromUTF8(keyRows[type]).getCharPointer(); !t.isEmpty();)
-        keys.add(t.getAndAdvance());
-    return keys;
+    static const std::array<KeyRow, rasguido::kChordTypes> rows {
+        KeyRow { '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '\'', 0xbf }, // ... 0 ' ¿
+        KeyRow { 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', 0xb4, '+' }, //  ... p ´ +
+        KeyRow { 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 0xf1, '{', '}' }, //  ... l ñ { }
+        KeyRow { 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '-', 0, 0 },
+    };
+    return rows;
 }
 
-/** The chord code a typed character plays, or -1. */
-int codeForKey(juce::juce_wchar c)
+bool isMappedKey(juce::juce_wchar c)
 {
     c = juce::CharacterFunctions::toLowerCase(c);
-    for (int type = 0; type < rasguido::kChordTypes; ++type)
-        if (const int root = rowKeys(type).indexOf(c); root >= 0)
-            return root + 12 * type;
-    return -1;
+    for (const auto& row : keyRows())
+        if (c != 0 && std::find(row.begin(), row.end(), c) != row.end())
+            return true;
+    return false;
 }
 } // namespace
 
 bool RasguidoEditor::keyPressed(const juce::KeyPress& key)
 {
-    // Swallow mapped keys (including auto-repeat) so the host doesn't act on them too.
-    return codeForKey(key.getTextCharacter()) >= 0;
+    // Swallow mapped keys (auto-repeat included) so the host doesn't act on them too.
+    return !key.getModifiers().isCommandDown() && isMappedKey(key.getTextCharacter());
 }
 
 bool RasguidoEditor::keyStateChanged(bool)
 {
-    bool handled = false;
+    pollKeys(); // react to the event right away; the poller covers anything the events miss
+    return std::any_of(keysDown.begin(), keysDown.end(), [](bool down) { return down; });
+}
+
+void RasguidoEditor::pollKeys()
+{
+    // Only while this editor has the keyboard: typing elsewhere must not play, and losing focus with
+    // keys held lets them go. Ctrl/Alt shortcuts (Ctrl+S in a DAW...) never play chords.
+    const auto mods = juce::ModifierKeys::getCurrentModifiersRealtime();
+    const bool active = isShowing() && hasKeyboardFocus(true) && !mods.isCommandDown() && !mods.isAltDown();
+
+    const auto& rows = keyRows();
     for (int type = 0; type < rasguido::kChordTypes; ++type)
     {
-        const auto keys = rowKeys(type);
-        for (int root = 0; root < keys.size(); ++root)
+        for (int root = 0; root < 12; ++root)
         {
+            const auto key = rows[(size_t) type][(size_t) root];
+            if (key == 0)
+                continue;
             const int code = root + 12 * type;
-            const bool down = juce::KeyPress::isKeyCurrentlyDown((int) keys[root]);
+            const bool down = active && juce::KeyPress::isKeyCurrentlyDown((int) key);
             if (down == keysDown[(size_t) code])
                 continue;
             keysDown[(size_t) code] = down;
             processor.playFromUi(down ? noteOn(rasguido::kFirstChordNote + code, 1.0f) : noteOff(rasguido::kFirstChordNote + code));
-            handled = true;
         }
     }
-    return handled;
-}
-
-void RasguidoEditor::releaseKeys()
-{
-    for (size_t code = 0; code < keysDown.size(); ++code)
-        if (std::exchange(keysDown[code], false))
-            processor.playFromUi(noteOff(rasguido::kFirstChordNote + (int) code));
 }
 
 void RasguidoEditor::refreshFromEngine()

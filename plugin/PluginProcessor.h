@@ -31,7 +31,8 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
-    /** The editor plays the instrument by sending the same MIDI a DAW would (thread-safe). */
+    /** The editor plays the instrument by sending the same MIDI a DAW would. Called from the message
+        thread only; the audio thread applies it at the start of its next block. */
     void playFromUi(const juce::MidiMessage& message);
 
     const rasguido::Engine& engine() const { return dsp; }
@@ -44,7 +45,15 @@ private:
     void readParams();
 
     rasguido::Engine dsp;
-    juce::MidiMessageCollector uiMidi;
+    // Lock-free queue from the editor to the audio thread. (A MidiMessageCollector would keep the
+    // events' relative timing, but always at the cost of one extra block of latency.)
+    struct UiEvent
+    {
+        juce::uint8 bytes[3];
+    };
+    static constexpr int uiQueueSize = 1024;
+    juce::AbstractFifo uiFifo { uiQueueSize };
+    std::array<UiEvent, uiQueueSize> uiEvents {};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RasguidoProcessor)
 };

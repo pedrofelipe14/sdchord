@@ -48,7 +48,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout RasguidoProcessor::createLay
 void RasguidoProcessor::prepareToPlay(double sampleRate, int)
 {
     dsp.prepare(sampleRate);
-    uiMidi.reset(sampleRate);
 }
 
 bool RasguidoProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -88,7 +87,8 @@ void RasguidoProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mid
 {
     juce::ScopedNoDenormals noDenormals;
     const int numSamples = buffer.getNumSamples();
-    uiMidi.removeNextBlockOfMessages(midi, numSamples);
+    // Whatever the editor played since the last block goes in first.
+    uiFifo.read(uiFifo.getNumReady()).forEach([&](int i) { midi.addEvent(uiEvents[(size_t) i].bytes, 3, 0); });
     readParams();
 
     // Render up to each MIDI event, then apply it: notes land on the exact sample.
@@ -112,9 +112,11 @@ void RasguidoProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mid
 
 void RasguidoProcessor::playFromUi(const juce::MidiMessage& message)
 {
-    auto m = message;
-    m.setTimeStamp(juce::Time::getMillisecondCounterHiRes() * 0.001);
-    uiMidi.addMessageToQueue(m);
+    if (message.getRawDataSize() != 3)
+        return;
+    UiEvent event;
+    std::copy_n(message.getRawData(), 3, event.bytes);
+    uiFifo.write(1).forEach([&](int i) { uiEvents[(size_t) i] = event; }); // dropped only if 1024 are already waiting
 }
 
 juce::AudioProcessorEditor* RasguidoProcessor::createEditor() { return new RasguidoEditor(*this); }
