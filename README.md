@@ -42,7 +42,7 @@ dsp/      the instrument: header-only C++17, no JUCE (it will also compile to We
   include/rasguido/effects.h   chorus and a small Freeverb-style reverb
   include/rasguido/engine.h    held-chord stack, strum logic, mixing
   tests/                       16 native tests
-plugin/   JUCE wrapper and the custom-painted editor
+plugin/   JUCE wrapper and the editor, drawn as 1980s hardware (cream body, LED readout, ribbed plate)
 tools/    an off-screen renderer that takes the screenshot above
 ```
 

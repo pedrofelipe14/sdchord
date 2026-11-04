@@ -1,20 +1,25 @@
 #include "PluginEditor.h"
 
+// The editor is drawn as a piece of 1980s hardware: a cream plastic body with silkscreened labels,
+// raised chord keys, a red LED readout, a ribbed metal strum plate and black knurled knobs.
+
 namespace
 {
 namespace Colours
 {
-const juce::Colour bgTop { 0xff1a1630 }, bgBottom { 0xff0d0b18 };
-const juce::Colour panel { 0xff221d3a }, panelEdge { 0xff352d55 };
-const juce::Colour text { 0xfff3eefc }, muted { 0xffa49cc0 }, faint { 0xff6d6590 };
-const juce::Colour glow { 0xffffcf7a }; // the strings
-// One per chord type: major, minor, seventh, minor seventh.
-const juce::Colour rows[] = { juce::Colour { 0xfff6e3bf }, juce::Colour { 0xffc6bdf7 }, juce::Colour { 0xfff7b9a0 }, juce::Colour { 0xffa9e6cf } };
+const juce::Colour bodyTop { 0xffeee4cf }, bodyBottom { 0xffd9c9aa }, bodyEdge { 0xffa8946f };
+const juce::Colour print { 0xff4a3a2b }, printSoft { 0xff7d6a54 }; // silkscreen ink
+const juce::Colour stripes[] = { juce::Colour { 0xff6b4630 }, juce::Colour { 0xffc5662f }, juce::Colour { 0xffd9a441 } };
+const juce::Colour keyTop { 0xfff6f1e6 }, keyBottom { 0xffd8cfbf }, keySide { 0xff9c8f7b };
+const juce::Colour recess { 0xffcbb995 }; // panels set into the body
+const juce::Colour ledOn { 0xffff3b22 }, ledOff { 0xff5a1810 }, ledWindow { 0xff1d0c09 };
+const juce::Colour plateTop { 0xff34302b }, plateBottom { 0xff1f1c19 }, ridge { 0xff4a443d };
+const juce::Colour glow { 0xffffb347 }; // a ringing string
 } // namespace Colours
 
 const char* const rootNames[] = { "C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B" };
 const char* const suffixes[] = { "", "m", "7", "m7" };
-const char* const rowNames[] = { "Mayor", "menor", "7", "m7" };
+const char* const rowNames[] = { "MAYOR", "MENOR", "7", "m7" };
 
 juce::String chordName(int code)
 {
@@ -25,53 +30,88 @@ juce::String chordName(int code)
 
 juce::String noteName(int midi) { return juce::String(rootNames[midi % 12]) + juce::String(midi / 12 - 1); }
 
-juce::Font font(float height, bool bold = false)
+juce::Font font(float height, const char* style = "Regular")
 {
-    return juce::Font(juce::FontOptions {}.withHeight(height).withStyle(bold ? "Bold" : "Regular"));
+    return juce::Font(juce::FontOptions {}.withHeight(height).withStyle(style));
 }
 
 juce::MidiMessage noteOn(int note, float velocity) { return juce::MidiMessage::noteOn(1, note, juce::jlimit(0.05f, 1.0f, velocity)); }
 juce::MidiMessage noteOff(int note) { return juce::MidiMessage::noteOff(1, note); }
+
+/** A panel moulded into the body: darker, with a shadow on the top edge and light on the bottom. */
+void drawRecess(juce::Graphics& g, juce::Rectangle<float> r, float corner)
+{
+    g.setColour(Colours::recess);
+    g.fillRoundedRectangle(r, corner);
+    g.setGradientFill(juce::ColourGradient(juce::Colours::black.withAlpha(0.22f), 0, r.getY(),
+                                           juce::Colours::transparentBlack, 0, r.getY() + 10, false));
+    g.fillRoundedRectangle(r, corner);
+    g.setColour(juce::Colours::white.withAlpha(0.45f));
+    g.drawLine(r.getX() + corner, r.getBottom() - 0.5f, r.getRight() - corner, r.getBottom() - 0.5f, 1.0f);
+    g.setColour(Colours::bodyEdge.withAlpha(0.6f));
+    g.drawRoundedRectangle(r, corner, 1.0f);
+}
+
+/** A small round LED with its glow. */
+void drawLed(juce::Graphics& g, juce::Point<float> c, float radius, float level)
+{
+    if (level > 0.01f)
+    {
+        g.setColour(Colours::ledOn.withAlpha(0.25f * level));
+        g.fillEllipse(juce::Rectangle<float>(radius * 5, radius * 5).withCentre(c));
+    }
+    g.setColour(Colours::ledOff.interpolatedWith(Colours::ledOn, level));
+    g.fillEllipse(juce::Rectangle<float>(radius * 2, radius * 2).withCentre(c));
+    g.setColour(juce::Colours::white.withAlpha(0.35f + 0.3f * level));
+    g.fillEllipse(juce::Rectangle<float>(radius * 0.7f, radius * 0.7f).withCentre(c.translated(-radius * 0.3f, -radius * 0.3f)));
+}
 } // namespace
 
 // ---- look and feel -----------------------------------------------------------------------------
 
 RasguidoLook::RasguidoLook()
 {
-    setColour(juce::BubbleComponent::backgroundColourId, Colours::panel);
-    setColour(juce::BubbleComponent::outlineColourId, Colours::panelEdge);
-    setColour(juce::TooltipWindow::textColourId, Colours::text);
+    setColour(juce::BubbleComponent::backgroundColourId, Colours::ledWindow);
+    setColour(juce::BubbleComponent::outlineColourId, Colours::print);
+    setColour(juce::TooltipWindow::textColourId, Colours::ledOn);
 }
 
-void RasguidoLook::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h, float pos, float start, float end, juce::Slider& s)
+void RasguidoLook::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h, float pos, float start, float end, juce::Slider&)
 {
-    const auto accent = s.findColour(juce::Slider::rotarySliderFillColourId);
-    const auto area = juce::Rectangle<int>(x, y, w, h).toFloat().reduced(4.0f);
+    const auto area = juce::Rectangle<int>(x, y, w, h).toFloat();
     const float radius = juce::jmin(area.getWidth(), area.getHeight()) * 0.5f;
     const auto centre = area.getCentre();
     const float angle = start + pos * (end - start);
 
-    // Track and value arc.
-    juce::Path track, value;
-    track.addCentredArc(centre.x, centre.y, radius - 2, radius - 2, 0.0f, start, end, true);
-    value.addCentredArc(centre.x, centre.y, radius - 2, radius - 2, 0.0f, start, angle, true);
-    g.setColour(Colours::panelEdge);
-    g.strokePath(track, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-    g.setColour(accent);
-    g.strokePath(value, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    // Scale printed on the body around the knob.
+    g.setColour(Colours::print);
+    for (int i = 0; i <= 10; ++i)
+    {
+        const float a = start + (end - start) * (float) i / 10.0f;
+        const float inner = radius - (i % 5 == 0 ? 6.0f : 4.0f);
+        g.drawLine(juce::Line<float>(centre.getPointOnCircumference(inner, a), centre.getPointOnCircumference(radius - 1.0f, a)),
+                   i % 5 == 0 ? 1.4f : 0.9f);
+    }
 
-    // Body.
-    const float body = radius - 8.0f;
-    g.setGradientFill(juce::ColourGradient(Colours::panelEdge.brighter(0.25f), centre.x, centre.y - body,
-                                           Colours::panel.darker(0.3f), centre.x, centre.y + body, false));
-    g.fillEllipse(centre.x - body, centre.y - body, body * 2, body * 2);
-    g.setColour(juce::Colours::black.withAlpha(0.35f));
-    g.drawEllipse(centre.x - body, centre.y - body, body * 2, body * 2, 1.0f);
+    // Knurled black knob: shadow, ribbed skirt, domed cap.
+    const float skirt = radius - 9.0f, cap = skirt - 4.0f;
+    g.setColour(juce::Colours::black.withAlpha(0.3f));
+    g.fillEllipse(juce::Rectangle<float>(skirt * 2, skirt * 2).withCentre(centre.translated(0, 2.5f)));
+    g.setColour(juce::Colour(0xff151312));
+    g.fillEllipse(juce::Rectangle<float>(skirt * 2, skirt * 2).withCentre(centre));
+    g.setColour(juce::Colour(0xff3a3632));
+    for (int i = 0; i < 28; ++i)
+    {
+        const float a = (float) i * juce::MathConstants<float>::twoPi / 28.0f + angle;
+        g.drawLine(juce::Line<float>(centre.getPointOnCircumference(cap, a), centre.getPointOnCircumference(skirt - 0.5f, a)), 1.0f);
+    }
+    g.setGradientFill(juce::ColourGradient(juce::Colour(0xff4a4540), centre.x - cap * 0.4f, centre.y - cap * 0.6f,
+                                           juce::Colour(0xff121110), centre.x + cap * 0.5f, centre.y + cap, true));
+    g.fillEllipse(juce::Rectangle<float>(cap * 2, cap * 2).withCentre(centre));
 
-    // Pointer.
-    const auto tip = centre.getPointOnCircumference(body - 5.0f, angle);
-    g.setColour(accent);
-    g.fillEllipse(tip.x - 2.5f, tip.y - 2.5f, 5.0f, 5.0f);
+    // White pointer line.
+    g.setColour(juce::Colour(0xfff2ede2));
+    g.drawLine(juce::Line<float>(centre.getPointOnCircumference(cap * 0.25f, angle), centre.getPointOnCircumference(cap - 1.5f, angle)), 2.2f);
 }
 
 // ---- chord grid --------------------------------------------------------------------------------
@@ -94,44 +134,43 @@ int ChordGrid::codeAt(juce::Point<float> p) const
 
 void ChordGrid::paint(juce::Graphics& g)
 {
+    drawRecess(g, getLocalBounds().toFloat().withTrimmedLeft(labelWidth - 8.0f), 10.0f);
+
     for (int type = 0; type < rasguido::kChordTypes; ++type)
     {
-        const auto colour = Colours::rows[type];
         const auto row = cellBounds(0, type);
-        g.setColour(colour.withAlpha(0.8f));
-        g.setFont(font(13.0f, true));
-        g.drawText(rowNames[type], juce::Rectangle<float>(0, row.getY(), labelWidth - 10, row.getHeight()), juce::Justification::centredRight);
+        g.setColour(Colours::print);
+        g.setFont(font(12.5f, "Bold"));
+        g.drawText(rowNames[type], juce::Rectangle<float>(0, row.getY(), labelWidth - 16, row.getHeight()), juce::Justification::centredRight);
 
         for (int root = 0; root < 12; ++root)
         {
             const int code = root + 12 * type;
-            const auto cell = cellBounds(root, type).reduced(3.0f);
-            const bool isHeld = code == held;
-            const bool isMemory = !isHeld && held < 0 && code == memory;
+            const bool down = code == held;
+            const bool remembered = held < 0 && code == memory;
+            auto key = cellBounds(root, type).reduced(5.0f, 7.0f);
+            const float depth = down ? 1.5f : 5.0f; // how far the key stands out of the body
 
-            if (isHeld)
-            {
-                // Soft halo, then a solid cap.
-                for (int i = 3; i > 0; --i)
-                {
-                    g.setColour(colour.withAlpha(0.09f * (float) i));
-                    g.fillRoundedRectangle(cell.expanded(2.5f * (float) (4 - i)), 10.0f);
-                }
-                g.setColour(colour);
-                g.fillRoundedRectangle(cell, 8.0f);
-                g.setColour(Colours::bgBottom);
-            }
-            else
-            {
-                g.setGradientFill(juce::ColourGradient(colour.withAlpha(0.16f), cell.getX(), cell.getY(),
-                                                       colour.withAlpha(0.07f), cell.getX(), cell.getBottom(), false));
-                g.fillRoundedRectangle(cell, 8.0f);
-                g.setColour(colour.withAlpha(isMemory ? 0.9f : 0.28f));
-                g.drawRoundedRectangle(cell, 8.0f, isMemory ? 1.6f : 1.0f);
-                g.setColour(colour.withAlpha(0.95f));
-            }
-            g.setFont(font(cell.getWidth() < 44 ? 12.5f : 14.0f, true));
-            g.drawText(chordName(code), cell, juce::Justification::centred);
+            // Shadow and side of the key, then its face.
+            g.setColour(juce::Colours::black.withAlpha(down ? 0.12f : 0.22f));
+            g.fillRoundedRectangle(key.translated(0, depth + 1.5f), 5.0f);
+            g.setColour(Colours::keySide);
+            g.fillRoundedRectangle(key.translated(0, depth), 5.0f);
+            key.translate(0, down ? 3.5f : 0.0f);
+            g.setGradientFill(juce::ColourGradient(down ? Colours::keyBottom : Colours::keyTop, 0, key.getY(),
+                                                   down ? Colours::keyBottom.darker(0.08f) : Colours::keyBottom, 0, key.getBottom(), false));
+            g.fillRoundedRectangle(key, 5.0f);
+            g.setColour(juce::Colours::white.withAlpha(down ? 0.2f : 0.7f));
+            g.drawLine(key.getX() + 4, key.getY() + 1, key.getRight() - 4, key.getY() + 1, 1.0f);
+            g.setColour(Colours::keySide.withAlpha(0.8f));
+            g.drawRoundedRectangle(key, 5.0f, 0.8f);
+
+            g.setColour(Colours::print);
+            g.setFont(font(key.getWidth() < 40 ? 11.5f : 13.0f, "Bold"));
+            g.drawText(chordName(code), key.withTrimmedTop(6.0f), juce::Justification::centred);
+
+            // A small LED on each key: lit while held, dim for the chord the strings remember.
+            drawLed(g, { key.getCentreX(), key.getY() + 7.0f }, 2.6f, down ? 1.0f : remembered ? 0.35f : 0.0f);
         }
     }
 }
@@ -181,7 +220,7 @@ void ChordGrid::show(int heldCode, int stringCode)
 
 // ---- strum plate -------------------------------------------------------------------------------
 
-juce::Rectangle<float> StrumPlate::stringArea() const { return getLocalBounds().toFloat().reduced(18.0f, 26.0f).withTrimmedLeft(30.0f); }
+juce::Rectangle<float> StrumPlate::stringArea() const { return getLocalBounds().toFloat().reduced(26.0f, 40.0f).withTrimmedLeft(26.0f); }
 
 float StrumPlate::positionAt(float y) const
 {
@@ -245,36 +284,55 @@ void StrumPlate::refresh()
 void StrumPlate::paint(juce::Graphics& g)
 {
     const auto bounds = getLocalBounds().toFloat();
-    g.setGradientFill(juce::ColourGradient(Colours::panel, 0, 0, Colours::bgBottom, 0, bounds.getBottom(), false));
-    g.fillRoundedRectangle(bounds, 18.0f);
-    g.setColour(Colours::panelEdge);
-    g.drawRoundedRectangle(bounds.reduced(0.5f), 18.0f, 1.0f);
+
+    // Moulded frame around the plate.
+    drawRecess(g, bounds, 16.0f);
+    g.setColour(Colours::print);
+    g.setFont(font(11.0f, "Bold"));
+    g.drawText("RASGUEO", bounds.withHeight(30).translated(0, 6), juce::Justification::centred);
+    g.setColour(Colours::printSoft);
+    g.setFont(font(10.0f));
+    g.drawText(juce::String::fromUTF8("\xe2\x96\xb2 agudo arriba  \xc2\xb7  grave abajo \xe2\x96\xbc"), bounds.withHeight(20).withBottomY(bounds.getBottom() - 8),
+               juce::Justification::centred);
+
+    // The dark metal plate with a bevelled edge.
+    const auto plate = bounds.reduced(16.0f, 32.0f);
+    g.setGradientFill(juce::ColourGradient(juce::Colour(0xff8c857b), plate.getX(), plate.getY(), juce::Colour(0xff3a3530), plate.getRight(), plate.getBottom(), false));
+    g.fillRoundedRectangle(plate.expanded(3.0f), 9.0f);
+    g.setGradientFill(juce::ColourGradient(Colours::plateTop, 0, plate.getY(), Colours::plateBottom, 0, plate.getBottom(), false));
+    g.fillRoundedRectangle(plate, 7.0f);
 
     const auto area = stringArea();
     const float gap = area.getHeight() / (float) rasguido::kStrings;
-    const auto notes = rasguido::stringNotes({ juce::jmax(0, chordCode) % 12, static_cast<rasguido::ChordType>(juce::jmax(0, chordCode) / 12) });
+    const int code = juce::jmax(0, chordCode);
+    const auto notes = rasguido::stringNotes({ code % 12, static_cast<rasguido::ChordType>(code / 12) });
 
     for (int s = 0; s < rasguido::kStrings; ++s)
     {
         const float y = area.getBottom() - gap * ((float) s + 0.5f);
         const float level = juce::jlimit(0.0f, 1.0f, glow[(size_t) s] * 1.6f);
 
-        g.setColour(Colours::faint);
-        g.setFont(font(11.0f));
-        g.drawText(noteName(notes[(size_t) s]), juce::Rectangle<float>(area.getX() - 34, y - 8, 30, 16), juce::Justification::centredRight);
+        g.setColour(juce::Colour(0xffa79f92));
+        g.setFont(font(10.0f));
+        g.drawText(noteName(notes[(size_t) s]), juce::Rectangle<float>(area.getX() - 30, y - 8, 26, 16), juce::Justification::centredRight);
+
+        // Each string is a ridge pressed into the metal: dark groove above, highlight below.
+        g.setColour(juce::Colours::black.withAlpha(0.55f));
+        g.fillRect(area.getX(), y - 2.0f, area.getWidth(), 2.0f);
+        g.setColour(Colours::ridge.brighter(0.4f));
+        g.fillRect(area.getX(), y, area.getWidth(), 1.0f);
 
         if (level > 0.01f)
         {
-            // Glow: wide and faint underneath, narrow and bright on top. A ringing string shimmers a little.
-            const float shimmer = 1.5f * level * std::sin((float) juce::Time::getMillisecondCounter() * 0.05f + (float) s);
-            for (int i = 4; i > 0; --i)
+            // A ringing string glows warm, like light under the plate.
+            for (int i = 3; i > 0; --i)
             {
-                g.setColour(Colours::glow.withAlpha(level * 0.12f * (float) (5 - i)));
-                g.fillRoundedRectangle(area.getX(), y - (float) i * 2.2f + shimmer * 0.3f, area.getWidth(), (float) i * 4.4f, (float) i * 2.2f);
+                g.setColour(Colours::glow.withAlpha(level * 0.14f * (float) (4 - i)));
+                g.fillRoundedRectangle(area.getX(), y - 1.0f - (float) i * 2.5f, area.getWidth(), (float) i * 5.0f + 1.0f, (float) i * 2.5f);
             }
+            g.setColour(Colours::glow.withAlpha(level));
+            g.fillRect(area.getX(), y - 1.0f, area.getWidth(), 1.6f);
         }
-        g.setColour(Colours::panelEdge.brighter(0.3f).interpolatedWith(Colours::glow, level));
-        g.fillRoundedRectangle(area.getX(), y - 1.0f - level, area.getWidth(), 2.0f + 2.0f * level, 1.5f);
     }
 }
 
@@ -285,16 +343,16 @@ RasguidoEditor::RasguidoEditor(RasguidoProcessor& p) : AudioProcessorEditor(&p),
     setLookAndFeel(&look);
 
     const std::pair<const char*, const char*> params[] = {
-        { "chordLevel", "Nivel" }, { "chordTone", "Tono" },    { "bassLevel", "Nivel" }, { "stringLevel", "Nivel" },
-        { "stringDecay", "Sustain" }, { "stringTone", "Brillo" }, { "chorus", "Chorus" },  { "reverb", "Reverb" },
-        { "wobble", "Wobble" },     { "master", "Volumen" },
+        { "chordLevel", "NIVEL" }, { "chordTone", "TONO" },     { "bassLevel", "NIVEL" }, { "stringLevel", "NIVEL" },
+        { "stringDecay", "SUSTAIN" }, { "stringTone", "BRILLO" }, { "chorus", "CHORUS" },  { "reverb", "REVERB" },
+        { "wobble", "WOBBLE" },     { "master", "VOLUMEN" },
     };
     sections = {
-        { "ACORDES", Colours::rows[1], 0, 2 },
-        { "BAJO", Colours::rows[2], 2, 1 },
-        { "CUERDAS", Colours::glow, 3, 3 },
-        { "EFECTOS", Colours::rows[3], 6, 3 },
-        { "SALIDA", Colours::rows[0], 9, 1 },
+        { "ACORDES", Colours::print, 0, 2 },
+        { "BAJO", Colours::print, 2, 1 },
+        { "CUERDAS", Colours::print, 3, 3 },
+        { "EFECTOS", Colours::print, 6, 3 },
+        { "SALIDA", Colours::print, 9, 1 },
     };
 
     for (size_t i = 0; i < knobs.size(); ++i)
@@ -306,13 +364,10 @@ RasguidoEditor::RasguidoEditor(RasguidoProcessor& p) : AudioProcessorEditor(&p),
         addAndMakeVisible(k.slider);
         k.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(processor.state, params[i].first, k.slider);
     }
-    for (const auto& s : sections)
-        for (int i = s.first; i < s.first + s.count; ++i)
-            knobs[(size_t) i].slider.setColour(juce::Slider::rotarySliderFillColourId, s.colour);
 
     addAndMakeVisible(grid);
     addAndMakeVisible(plate);
-    setSize(1040, 600);
+    setSize(1060, 620);
     startTimerHz(40);
 }
 
@@ -328,73 +383,118 @@ void RasguidoEditor::refreshFromEngine()
     {
         shownHeld = held;
         shownMemory = memory;
-        repaint(getLocalBounds().removeFromTop(80));
+        repaint(getLocalBounds().removeFromTop(100));
     }
 }
 
 void RasguidoEditor::paint(juce::Graphics& g)
 {
-    g.setGradientFill(juce::ColourGradient(Colours::bgTop, 0, 0, Colours::bgBottom, 0, (float) getHeight(), false));
-    g.fillAll();
+    // Behind the instrument, then the body itself with a soft highlight along the top.
+    g.fillAll(juce::Colour(0xff2b2420));
+    const auto body = getLocalBounds().toFloat().reduced(6.0f);
+    g.setColour(juce::Colours::black.withAlpha(0.4f));
+    g.fillRoundedRectangle(body.translated(0, 3), 30.0f);
+    g.setGradientFill(juce::ColourGradient(Colours::bodyTop, 0, body.getY(), Colours::bodyBottom, 0, body.getBottom(), false));
+    g.fillRoundedRectangle(body, 30.0f);
+    g.setColour(juce::Colours::white.withAlpha(0.55f));
+    g.drawRoundedRectangle(body.reduced(1.5f), 29.0f, 1.2f);
+    g.setColour(Colours::bodyEdge);
+    g.drawRoundedRectangle(body, 30.0f, 1.5f);
 
-    // Title.
-    g.setColour(Colours::text);
-    g.setFont(font(30.0f, true));
-    g.drawText("Rasguido", 32, 20, 220, 40, juce::Justification::centredLeft);
-    g.setColour(Colours::muted);
-    g.setFont(font(13.0f));
-    g.drawText("acordes + arpa", 182, 32, 160, 20, juce::Justification::centredLeft);
+    // Faint plastic grain, the same every time.
+    juce::Random grain(7);
+    for (int i = 0; i < 2600; ++i)
+    {
+        g.setColour((i % 2 ? juce::Colours::white : Colours::bodyEdge).withAlpha(0.06f + grain.nextFloat() * 0.06f));
+        g.fillRect(body.getX() + grain.nextFloat() * body.getWidth(), body.getY() + grain.nextFloat() * body.getHeight(), 1.0f, 1.0f);
+    }
 
-    // Current chord: what you hold, or (dimmer) what the strings will play.
+    // Brand, silkscreened, with the three-colour stripe under it.
+    const float left = 44.0f;
+    g.setColour(Colours::print);
+    g.setFont(font(34.0f, "Bold Italic"));
+    g.drawText("Rasguido", juce::Rectangle<float>(left, 22, 240, 44), juce::Justification::centredLeft);
+    g.setFont(font(11.5f, "Bold"));
+    g.setColour(Colours::printSoft);
+    g.drawText(juce::String::fromUTF8("ARPA ELECTR\xc3\x93NICA DE ACORDES"), juce::Rectangle<float>(left + 2, 64, 300, 16), juce::Justification::centredLeft);
+    const float stripeRight = (float) plate.getX() - 30.0f;
+    for (int i = 0; i < 3; ++i)
+    {
+        g.setColour(Colours::stripes[i]);
+        g.fillRect(left, 88.0f + (float) i * 5.0f, stripeRight - left, 3.0f);
+    }
+
+    // Red LED readout with the current chord (dimmer when it is only the strings' memory).
     const bool holding = shownHeld >= 0;
-    const auto pill = juce::Rectangle<float>(470, 18, 150, 44);
-    const auto colour = Colours::rows[juce::jmax(0, holding ? shownHeld : shownMemory) / 12];
-    g.setColour(colour.withAlpha(holding ? 0.22f : 0.08f));
-    g.fillRoundedRectangle(pill, 22.0f);
-    g.setColour(colour.withAlpha(holding ? 1.0f : 0.45f));
-    g.drawRoundedRectangle(pill, 22.0f, 1.2f);
-    g.setFont(font(24.0f, true));
-    g.drawText(chordName(holding ? shownHeld : shownMemory), pill, juce::Justification::centred);
-    g.setColour(Colours::faint);
-    g.setFont(font(12.0f));
-    g.drawText(holding ? "sonando" : "en las cuerdas", pill.withX(pill.getRight() + 12).withWidth(110), juce::Justification::centredLeft);
+    const auto window = juce::Rectangle<float>(stripeRight - 214, 20, 150, 46);
+    g.setColour(Colours::bodyEdge);
+    g.fillRoundedRectangle(window.expanded(4.0f), 8.0f);
+    g.setColour(Colours::ledWindow);
+    g.fillRoundedRectangle(window, 5.0f);
+    g.setFont(font(30.0f, "Bold"));
+    const auto lit = Colours::ledOn.withAlpha(holding ? 1.0f : 0.55f);
+    g.setColour(lit.withAlpha(holding ? 0.3f : 0.15f));
+    g.drawText(chordName(holding ? shownHeld : shownMemory), window.translated(0, 1).expanded(1.0f), juce::Justification::centred);
+    g.setColour(lit);
+    g.drawText(chordName(holding ? shownHeld : shownMemory), window, juce::Justification::centred);
+    g.setColour(Colours::print);
+    g.setFont(font(10.0f, "Bold"));
+    g.drawText("ACORDE", window.withY(window.getBottom() + 5).withHeight(13), juce::Justification::centred);
 
-    // Knob sections.
+    // Power LED.
+    drawLed(g, { stripeRight - 30, 42 }, 4.0f, 1.0f);
+    g.setColour(Colours::print);
+    g.setFont(font(9.5f, "Bold"));
+    g.drawText("ON", juce::Rectangle<float>(stripeRight - 48, 50, 36, 14), juce::Justification::centred);
+
+    // Control panel set into the body, with bracketed section titles like a hardware front panel.
+    const auto firstKnob = knobs.front().slider.getBounds().toFloat();
+    drawRecess(g, juce::Rectangle<float>(left, firstKnob.getY() - 40, stripeRight - left, firstKnob.getHeight() + 70), 12.0f);
     for (const auto& s : sections)
     {
-        const auto first = knobs[(size_t) s.first].slider.getBounds();
-        const auto last = knobs[(size_t) (s.first + s.count - 1)].slider.getBounds();
-        const auto box = first.getUnion(last).toFloat().expanded(6.0f, 0.0f).withTop((float) first.getY() - 30).withBottom((float) first.getBottom() + 26);
-        g.setColour(Colours::panel.withAlpha(0.55f));
-        g.fillRoundedRectangle(box, 14.0f);
-        g.setColour(s.colour.withAlpha(0.85f));
-        g.setFont(font(11.5f, true));
-        g.drawText(s.title, box.withHeight(26).translated(0, 4), juce::Justification::centred);
+        const auto first = knobs[(size_t) s.first].slider.getBounds().toFloat();
+        const auto last = knobs[(size_t) (s.first + s.count - 1)].slider.getBounds().toFloat();
+        const float x0 = first.getX() + 4, x1 = last.getRight() - 4, y = first.getY() - 18;
+        g.setColour(Colours::print);
+        g.setFont(font(10.5f, "Bold"));
+        const float textWidth = (float) s.title.length() * 7.5f + 12.0f;
+        const float mid = (x0 + x1) * 0.5f;
+        g.drawText(s.title, juce::Rectangle<float>(mid - textWidth / 2, y - 7, textWidth, 14), juce::Justification::centred);
+        if (x1 - x0 > textWidth + 8)
+        {
+            g.drawLine(x0, y, mid - textWidth / 2, y, 1.0f);
+            g.drawLine(mid + textWidth / 2, y, x1, y, 1.0f);
+            g.drawLine(x0, y, x0, y + 5, 1.0f);
+            g.drawLine(x1, y, x1, y + 5, 1.0f);
+        }
 
         for (int i = s.first; i < s.first + s.count; ++i)
         {
             const auto& k = knobs[(size_t) i];
-            g.setColour(Colours::muted);
-            g.setFont(font(12.0f));
-            g.drawText(k.label, k.slider.getBounds().withY(k.slider.getBottom() - 2).withHeight(20), juce::Justification::centred);
+            g.setFont(font(10.0f, "Bold"));
+            g.drawText(k.label, k.slider.getBounds().withY(k.slider.getBottom() + 1).withHeight(16), juce::Justification::centred);
         }
     }
 
-    // How to play it from a DAW.
-    g.setColour(Colours::faint);
-    g.setFont(font(11.5f));
+    // How to play it from a DAW, printed small along the bottom edge.
+    g.setColour(Colours::printSoft);
+    g.setFont(font(10.5f));
     g.drawText(juce::String::fromUTF8("MIDI: C1 mayor \xc2\xb7 C2 menor \xc2\xb7 C3 7 \xc2\xb7 C4 m7 \xc2\xb7 C5-C6 cuerdas \xc2\xb7 rueda de modulaci\xc3\xb3n = rasgueo"),
-               32, getHeight() - 30, 700, 18, juce::Justification::centredLeft);
+               juce::Rectangle<float>(left, (float) getHeight() - 36, 640, 16), juce::Justification::centredLeft);
 }
 
 void RasguidoEditor::resized()
 {
-    plate.setBounds(getWidth() - 300, 24, 276, getHeight() - 48);
-    grid.setBounds(32, 90, getWidth() - 300 - 32 - 28, 280);
+    plate.setBounds(getWidth() - 318, 28, 284, getHeight() - 56);
+    const int left = 44, right = plate.getX() - 30;
+    grid.setBounds(left - 6, 118, right - left + 6, 268);
 
     // Knobs in one row, grouped with a gap between sections.
-    const int knob = 54, gap = 6, sectionGap = 22, y = 450;
-    int x = 38;
+    const int knob = 58, gap = 4, sectionGap = 18, y = 462;
+    int total = 0;
+    for (const auto& s : sections)
+        total += s.count * (knob + gap) - gap + sectionGap;
+    int x = left + (right - left - (total - sectionGap)) / 2;
     for (const auto& s : sections)
     {
         for (int i = s.first; i < s.first + s.count; ++i)
