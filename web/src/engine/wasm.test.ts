@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { FIRST_CHORD_NOTE, FIRST_STRING_NOTE } from './chords'
-import { ParamId } from './params'
+import { ParamId, RHYTHMS } from './params'
 
 // Runs the real compiled engine (public/pedrochord.wasm, built by scripts/build-wasm.sh) the same way
 // the AudioWorklet does.
@@ -21,6 +21,11 @@ interface Engine {
   pc_string_chord(): number
   pc_string_glow(string: number): number
   pc_pluck_count(): number
+  pc_rhythm_step(): number
+  pc_drum_hits(): number
+  pc_rhythm_count(): number
+  pc_rhythm_length(pattern: number): number
+  pc_rhythm_steps_per_beat(pattern: number): number
 }
 
 function load(): Engine {
@@ -79,6 +84,27 @@ describe.skipIf(!existsSync(wasmUrl))('compiled engine (pedrochord.wasm)', () =>
     for (let v = 0; v <= 127; v += 4) engine.pc_control_change(1, v)
     engine.pc_control_change(1, 127)
     expect(engine.pc_pluck_count()).toBe(13)
+  })
+
+  it('agrees with the page on the rhythm patterns', () => {
+    const engine = load()
+    expect(engine.pc_rhythm_count()).toBe(RHYTHMS.length)
+    RHYTHMS.forEach((r, i) => {
+      expect(engine.pc_rhythm_length(i)).toBe(r.length)
+      expect(engine.pc_rhythm_steps_per_beat(i)).toBe(r.stepsPerBeat)
+    })
+  })
+
+  it('plays the drums and reports the step', () => {
+    const engine = load()
+    expect(engine.pc_rhythm_step()).toBe(-1)
+    engine.pc_set_param(ParamId.rhythmOn, 1)
+    expect(renderRms(engine, 100)).toBeGreaterThan(0.01)
+    expect(engine.pc_drum_hits()).toBeGreaterThan(0)
+    expect(engine.pc_rhythm_step()).toBeGreaterThanOrEqual(0)
+    engine.pc_set_param(ParamId.rhythmOn, 0)
+    renderRms(engine, 1)
+    expect(engine.pc_rhythm_step()).toBe(-1)
   })
 
   it('runs the auto-strum in time while a chord is held', () => {

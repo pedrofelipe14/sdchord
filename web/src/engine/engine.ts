@@ -13,9 +13,10 @@ export interface EngineState {
   held: number // chord being held (root + 12 * type), or -1
   memory: number // chord the strings play
   glow: Float32Array // how loud each string rings
+  rhythmStep: number // the rhythm machine's step in its bar, or -1 when stopped
 }
 
-export const silentState = (): EngineState => ({ held: -1, memory: 0, glow: new Float32Array(STRINGS) })
+export const silentState = (): EngineState => ({ held: -1, memory: 0, glow: new Float32Array(STRINGS), rhythmStep: -1 })
 
 /** Main-thread handle on the instrument running in the AudioWorklet.
     Browsers only allow audio after a user gesture, so start() is called from one. Whatever is

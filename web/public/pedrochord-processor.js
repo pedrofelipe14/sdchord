@@ -1,9 +1,10 @@
 // Runs the C++ engine (compiled to pedrochord.wasm) on the browser's audio thread.
 // The main thread sends the .wasm bytes once, then notes and parameter changes as messages.
-// About 45 times a second it gets back what the UI shows: the held chord and how loud each string rings.
+// About 45 times a second it gets back what the UI shows: the held chord, how loud each string rings,
+// and where the rhythm machine is in its bar.
 
 const STRINGS = 13
-const STATE_EVERY_BLOCKS = 8 // 8 x 128 frames ≈ 21 ms at 48 kHz
+const STATE_EVERY_BLOCKS = 4 // 4 x 128 frames ≈ 11 ms at 48 kHz: quick enough for the step LEDs
 
 class PedrochordProcessor extends AudioWorkletProcessor {
   constructor(options) {
@@ -53,7 +54,10 @@ class PedrochordProcessor extends AudioWorkletProcessor {
     if (++this.blocks % STATE_EVERY_BLOCKS === 0) {
       const glow = new Float32Array(STRINGS)
       for (let s = 0; s < STRINGS; s++) glow[s] = e.pc_string_glow(s)
-      this.port.postMessage({ type: 'state', held: e.pc_held_chord(), memory: e.pc_string_chord(), glow }, [glow.buffer])
+      this.port.postMessage(
+        { type: 'state', held: e.pc_held_chord(), memory: e.pc_string_chord(), glow, rhythmStep: e.pc_rhythm_step() },
+        [glow.buffer],
+      )
     }
     return true
   }

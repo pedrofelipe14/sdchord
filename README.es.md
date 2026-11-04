@@ -27,9 +27,11 @@
 
 - **Rasgueo automático:** un secuenciador que toca las cuerdas solo, a tempo, mientras mantenés un acorde. Tiene cinco patrones (arriba, abajo, ida y vuelta, rasgueo completo alternando bajada y subida, y al azar), figuras de negra a semicorchea con tresillos, y un rango que define cuántas cuerdas usa. El primer paso de cada tiempo va acentuado. Con SYNC sigue el tempo del DAW. La barra espaciadora lo prende y lo apaga.
 
+- **Caja de ritmos (versión web):** ocho ritmos de un compás, preprogramados al estilo de las cajas de ritmo viejas (rock, disco, balada, bossa nova, cumbia, rumba, vals y swing). Cada sonido de batería es sintetizado, sin samples: bombo, redoblante, aro, hi-hat abierto y cerrado, dos congas y cencerro. Comparte el tempo con el rasgueo automático y, mientras suena, marca el pulso: los rasgueos se enganchan a su grilla. Enter la arranca y la frena.
+
 ### Teclado de la compu
 
-`1`–`0` mayor · `Q`–`P` menor · `A`–`Ñ` séptima · `Z`–`M` menor séptima (desde C, de izquierda a derecha, teclado latinoamericano) · espacio: rasgueo automático.
+`1`–`0` mayor · `Q`–`P` menor · `A`–`Ñ` séptima · `Z`–`M` menor séptima (desde C, de izquierda a derecha, teclado latinoamericano) · espacio: rasgueo automático · enter: caja de ritmos (web).
 
 ### Desde un DAW (MIDI)
 
@@ -49,8 +51,9 @@ dsp/      el instrumento: C++17 header-only, sin JUCE, así lo comparten el plug
   include/pedrochord/chords.h    acordes, voicings y el mapeo MIDI
   include/pedrochord/voices.h    voces de colchón, bajo y cuerdas FM
   include/pedrochord/effects.h   chorus y una reverb chica estilo Freeverb
-  include/pedrochord/engine.h    pila de acordes apretados, lógica de rasgueo, el secuenciador y la mezcla
-  tests/                       22 tests nativos
+  include/pedrochord/engine.h    pila de acordes apretados, lógica de rasgueo, el secuenciador, el reloj compartido y la mezcla
+  include/pedrochord/rhythm.h    la caja de ritmos: voces de batería sintetizadas y los patrones
+  tests/                       28 tests nativos
 plugin/   la capa JUCE y el editor, dibujado como hardware de los 80 (cuerpo naranja, display de LEDs, placa ranurada)
 tools/    un renderizador fuera de pantalla que saca la captura de arriba
 dsp/src/wasm_api.cpp + scripts/build-wasm.sh   una API en C sobre el motor, compilada a un .wasm de 23 KB sin JS generado
@@ -61,7 +64,7 @@ web/      la versión para navegador: React + TypeScript, con el motor en un Aud
 - **Precisión de muestra.** El procesador renderiza hasta cada evento MIDI y recién ahí lo aplica, así que un rasgueo mantiene su tiempo dentro de un bloque.
 - **Nada reserva memoria en el hilo de audio.** Las líneas de delay son arrays de tamaño fijo, y la interfaz lee el estado del motor (acorde apretado, brillo de cada cuerda) desde atomics.
 - **Validado como lo cargaría un DAW:** el CI corre [pluginval](https://github.com/Tracktion/pluginval) en su nivel más estricto (10) en cada push: distintos sample rates y tamaños de bloque, guardar y restaurar estado, automatización, valores aleatorios en los parámetros y abrir el editor mientras procesa audio.
-- **Un motor, dos casas.** El navegador corre exactamente el mismo código de `dsp/`: el AudioWorklet instancia el .wasm directamente, le manda notas y parámetros como mensajes, y recibe el acorde apretado y el nivel de cada cuerda para dibujarlos. La página tiene teclas de acorde multitouch por las que se puede deslizar el dedo, una franja que en el celu se pone horizontal, el teclado de la compu por posición física de la tecla (sirve para cualquier distribución) y controladores Web MIDI. Sus 12 tests incluyen el motor compilado y un chequeo de que los IDs de parámetros coincidan con los del C++.
+- **Un motor, dos casas.** El navegador corre exactamente el mismo código de `dsp/`: el AudioWorklet instancia el .wasm directamente, le manda notas y parámetros como mensajes, y recibe el acorde apretado y el nivel de cada cuerda para dibujarlos. La página tiene teclas de acorde multitouch por las que se puede deslizar el dedo, una franja que en el celu se pone horizontal, el teclado de la compu por posición física de la tecla (sirve para cualquier distribución) y controladores Web MIDI. Sus 14 tests incluyen el motor compilado y un chequeo de que los IDs de parámetros coincidan con los del C++.
 - **Testeado sin DAW:** el tempo del rasgueo automático en cada figura y el orden de cada patrón, los voicings, el mapeo MIDI, la pila de acordes, que un rasgueo pulse las cuerdas correctas, que el decay no dependa del sample rate, y una prueba de estrés con todo al máximo que no da valores inválidos ni llega a saturar.
 
 ## Compilar
@@ -81,6 +84,7 @@ cmake -S dsp -B dsp/build && cmake --build dsp/build --config Release && dsp/bui
 ## Próximos pasos
 
 - [x] Rasgueo automático (secuenciador).
-- [ ] Sección rítmica: patrones de batería con un bajo automático que sigue al acorde.
+- [x] Caja de ritmos con patrones preprogramados, sincronizada con el rasgueo automático (versión web).
+- [ ] Un bajo automático que siga al acorde a tempo con la batería.
 - [x] Tocar con el teclado de la compu: 1-0 mayor, Q-P menor, A-Ñ 7, Z-M m7 (teclado latinoamericano).
 - [x] La versión web: el mismo `dsp/` compilado a WebAssembly, para tocar desde el celular.

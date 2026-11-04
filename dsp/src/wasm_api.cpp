@@ -31,6 +31,9 @@ enum ParamId
     seqPattern,
     seqRate,
     seqRange,
+    rhythmOn,
+    rhythmPattern,
+    rhythmLevel,
 };
 } // namespace
 
@@ -63,6 +66,9 @@ EMSCRIPTEN_KEEPALIVE void pc_set_param(int id, float value)
         case seqPattern: p.seqPattern = (int) value; break;
         case seqRate: p.seqRate = (int) value; break;
         case seqRange: p.seqRange = (int) value; break;
+        case rhythmOn: p.rhythmOn = value > 0.5f; break;
+        case rhythmPattern: p.rhythmPattern = (int) value; break;
+        case rhythmLevel: p.rhythmLevel = value; break;
         default: break;
     }
 }
@@ -83,4 +89,11 @@ EMSCRIPTEN_KEEPALIVE int pc_held_chord() { return engine.heldChordCode(); }
 EMSCRIPTEN_KEEPALIVE int pc_string_chord() { return engine.stringChordCode(); }
 EMSCRIPTEN_KEEPALIVE float pc_string_glow(int string) { return engine.stringGlow(string); }
 EMSCRIPTEN_KEEPALIVE int pc_pluck_count() { return engine.pluckCount(); }
+EMSCRIPTEN_KEEPALIVE int pc_rhythm_step() { return engine.rhythmStep(); }
+EMSCRIPTEN_KEEPALIVE int pc_drum_hits() { return engine.drumHits(); }
+
+// The rhythm patterns' shape, so the page can lay out its step LEDs (a test checks web/src agrees).
+EMSCRIPTEN_KEEPALIVE int pc_rhythm_count() { return pedrochord::kRhythmPatterns; }
+EMSCRIPTEN_KEEPALIVE int pc_rhythm_length(int pattern) { return pedrochord::rhythmPatterns()[(size_t) pattern].length; }
+EMSCRIPTEN_KEEPALIVE int pc_rhythm_steps_per_beat(int pattern) { return pedrochord::rhythmPatterns()[(size_t) pattern].stepsPerBeat; }
 }

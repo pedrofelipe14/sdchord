@@ -5,7 +5,7 @@ import { StrumPlate } from './components/StrumPlate'
 import { chordName } from './engine/chords'
 import { type EngineState, PedrochordEngine, silentState } from './engine/engine'
 import { chordForKey } from './engine/keyboard'
-import { defaultValues, type Lang, PARAMS, ParamId } from './engine/params'
+import { defaultValues, type Lang, PARAMS, ParamId, RHYTHMS } from './engine/params'
 import { initialLang, saveLang, STRINGS } from './i18n'
 
 const REPO = 'https://github.com/pedrofelipe14/pedrochord'
@@ -27,6 +27,11 @@ const SEQ_KNOBS: [ParamId, KnobKey][] = [
   [ParamId.seqRate, 'rate'],
   [ParamId.seqRange, 'range'],
 ]
+const RHYTHM_KNOBS: [ParamId, KnobKey][] = [
+  [ParamId.rhythmPattern, 'rhythm'],
+  [ParamId.seqBpm, 'tempo'], // one tempo for the drums and the auto-strum
+  [ParamId.rhythmLevel, 'volume'],
+]
 
 export default function App() {
   const engine = useMemo(() => new PedrochordEngine(), [])
@@ -44,9 +49,14 @@ export default function App() {
 
   useEffect(() => engine.onState(setState), [engine])
 
-  // The space bar flips seqOn in the UI state; this sends it on to the engine.
+  // Space and Enter flip seqOn and rhythmOn in the UI state; this sends them on to the engine.
   const seqOnValue = values[ParamId.seqOn]
+  const rhythmOnValue = values[ParamId.rhythmOn]
   useEffect(() => engine.setParam(ParamId.seqOn, seqOnValue), [engine, seqOnValue])
+  useEffect(() => {
+    engine.setParam(ParamId.rhythmOn, rhythmOnValue)
+    if (rhythmOnValue) void engine.start().then(() => setRunning(true)) // the drums need audio running
+  }, [engine, rhythmOnValue])
 
   const setParam = (id: ParamId, value: number) => {
     engine.setParam(id, value)
@@ -59,9 +69,10 @@ export default function App() {
     const held = new Map<string, number>()
     const down = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return
-      if (e.code === 'Space') {
+      const toggle = e.code === 'Space' ? ParamId.seqOn : e.code === 'Enter' ? ParamId.rhythmOn : undefined
+      if (toggle !== undefined) {
         e.preventDefault()
-        if (!e.repeat) setValues((v) => v.map((old, i) => (i === ParamId.seqOn ? 1 - old : old)))
+        if (!e.repeat) setValues((v) => v.map((old, i) => (i === toggle ? 1 - old : old)))
         return
       }
       const code = chordForKey(e.code)
@@ -125,6 +136,10 @@ export default function App() {
 
   const holding = state.held >= 0
   const seqOn = values[ParamId.seqOn] > 0.5
+  const rhythmOn = values[ParamId.rhythmOn] > 0.5
+  const rhythm = RHYTHMS[values[ParamId.rhythmPattern]]
+  const beats = rhythm.length / rhythm.stepsPerBeat
+  const onBeat = state.rhythmStep >= 0 && state.rhythmStep % rhythm.stepsPerBeat === 0
 
   return (
     <main className="stage">
@@ -214,6 +229,46 @@ export default function App() {
                   ))}
                 </div>
               </div>
+            </section>
+
+            <section className="recess rhythm-panel">
+              <h2 className="bracket wide">
+                <span>{t.sections.rhythm}</span>
+              </h2>
+              <div className="seq-row">
+                <button
+                  className={`key toggle${rhythmOn ? ' down' : ''}`}
+                  aria-pressed={rhythmOn}
+                  onClick={() => setValues((v) => v.map((old, i) => (i === ParamId.rhythmOn ? 1 - old : old)))}
+                >
+                  {/* Blinks on every beat while the drums play. */}
+                  <span className={`led${rhythmOn && onBeat ? ' on' : ''}`} />
+                  <span className="key-label">{t.startKey}</span>
+                </button>
+                <div className={`led-window seq-readout${rhythmOn ? '' : ' off'}`}>
+                  <span className="line1">{rhythm.name[lang].toUpperCase()}</span>
+                  <span className="line2">
+                    {beats}/4 · {Math.round(values[ParamId.seqBpm])} BPM
+                  </span>
+                </div>
+                <div className="knob-row">
+                  {RHYTHM_KNOBS.map(([id, label]) => (
+                    <Knob key={id} id={id} value={values[id]} label={t.knobs[label]} lang={lang} onChange={(v) => setParam(id, v)} />
+                  ))}
+                </div>
+              </div>
+              {/* One LED per step, grouped by beat, like the step lights on a drum machine. */}
+              <div className="steps" aria-hidden="true">
+                {Array.from({ length: beats }, (_, beat) => (
+                  <div className="beat" key={beat}>
+                    {Array.from({ length: rhythm.stepsPerBeat }, (_, i) => {
+                      const step = beat * rhythm.stepsPerBeat + i
+                      return <span key={i} className={`led${rhythmOn && state.rhythmStep === step ? ' on' : ''}`} />
+                    })}
+                  </div>
+                ))}
+              </div>
+              <p className="panel-note">{t.rhythmHint}</p>
             </section>
           </div>
 
