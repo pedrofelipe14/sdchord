@@ -1,0 +1,86 @@
+// C entry points the AudioWorklet calls. Built as a standalone .wasm with no JS glue (see
+// scripts/build-wasm.sh): the worklet instantiates it directly and copies audio out of two buffers.
+
+#include <emscripten/emscripten.h>
+
+#include "pedrochord/engine.h"
+
+namespace
+{
+constexpr int maxBlock = 1024;
+
+pedrochord::Engine engine;
+float outLeft[maxBlock];
+float outRight[maxBlock];
+
+/** Parameter ids shared with web/src/engine/params.ts (a test checks they match). */
+enum ParamId
+{
+    chordLevel,
+    chordTone,
+    bassLevel,
+    stringLevel,
+    stringDecay,
+    stringTone,
+    chorus,
+    reverb,
+    wobble,
+    master,
+    seqOn,
+    seqBpm,
+    seqPattern,
+    seqRate,
+    seqRange,
+};
+} // namespace
+
+extern "C"
+{
+EMSCRIPTEN_KEEPALIVE void pc_init(float sampleRate) { engine.prepare(sampleRate); }
+
+EMSCRIPTEN_KEEPALIVE void pc_note_on(int note, float velocity) { engine.noteOn(note, velocity); }
+EMSCRIPTEN_KEEPALIVE void pc_note_off(int note) { engine.noteOff(note); }
+EMSCRIPTEN_KEEPALIVE void pc_control_change(int cc, int value) { engine.controlChange(cc, value); }
+EMSCRIPTEN_KEEPALIVE void pc_all_notes_off() { engine.allNotesOff(); }
+
+EMSCRIPTEN_KEEPALIVE void pc_set_param(int id, float value)
+{
+    auto& p = engine.params;
+    switch (id)
+    {
+        case chordLevel: p.chordLevel = value; break;
+        case chordTone: p.chordTone = value; break;
+        case bassLevel: p.bassLevel = value; break;
+        case stringLevel: p.stringLevel = value; break;
+        case stringDecay: p.stringDecay = value; break;
+        case stringTone: p.stringTone = value; break;
+        case chorus: p.chorus = value; break;
+        case reverb: p.reverb = value; break;
+        case wobble: p.wobble = value; break;
+        case master: p.master = value; break;
+        case seqOn: p.seqOn = value > 0.5f; break;
+        case seqBpm: p.seqBpm = value; break;
+        case seqPattern: p.seqPattern = (int) value; break;
+        case seqRate: p.seqRate = (int) value; break;
+        case seqRange: p.seqRange = (int) value; break;
+        default: break;
+    }
+}
+
+/** Renders up to maxBlock frames into the buffers returned by pc_left/pc_right. */
+EMSCRIPTEN_KEEPALIVE void pc_process(int numFrames)
+{
+    if (numFrames > maxBlock)
+        numFrames = maxBlock;
+    engine.process(outLeft, outRight, numFrames);
+}
+
+EMSCRIPTEN_KEEPALIVE float* pc_left() { return outLeft; }
+EMSCRIPTEN_KEEPALIVE float* pc_right() { return outRight; }
+
+// State for the UI.
+EMSCRIPTEN_KEEPALIVE int pc_held_chord() { return engine.heldChordCode(); }
+EMSCRIPTEN_KEEPALIVE int pc_string_chord() { return engine.stringChordCode(); }
+EMSCRIPTEN_KEEPALIVE float pc_string_glow(int string) { return engine.stringGlow(string); }
+EMSCRIPTEN_KEEPALIVE int pc_pluck_count() { return engine.pluckCount(); }
+}
