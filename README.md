@@ -67,5 +67,5 @@ cmake -S dsp -B dsp/build && cmake --build dsp/build --config Release && dsp/bui
 ## Roadmap
 
 - [ ] A rhythm section: drum patterns with an auto-bass that follows the chord.
-- [ ] Computer-keyboard play in the standalone app.
+- [x] Computer-keyboard play: 1-0 major, Q-P minor, A-Ñ 7, Z-M m7 (Latin American layout).
 - [ ] The web version: the same `dsp/` compiled to WebAssembly, playable on a phone.

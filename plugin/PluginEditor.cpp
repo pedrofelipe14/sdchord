@@ -14,7 +14,7 @@ const juce::Colour keyTop { 0xfff6f1e6 }, keyBottom { 0xffd8cfbf }, keySide { 0x
 const juce::Colour recess { 0xffcbb995 }; // panels set into the body
 const juce::Colour ledOn { 0xffff3b22 }, ledOff { 0xff5a1810 }, ledWindow { 0xff1d0c09 };
 const juce::Colour plateTop { 0xff34302b }, plateBottom { 0xff1f1c19 }, ridge { 0xff4a443d };
-const juce::Colour glow { 0xffffb347 }; // a ringing string
+const juce::Colour ringing { 0xffd9d3c7 }; // the ridge of a string that is sounding
 } // namespace Colours
 
 const char* const rootNames[] = { "C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B" };
@@ -319,20 +319,9 @@ void StrumPlate::paint(juce::Graphics& g)
         // Each string is a ridge pressed into the metal: dark groove above, highlight below.
         g.setColour(juce::Colours::black.withAlpha(0.55f));
         g.fillRect(area.getX(), y - 2.0f, area.getWidth(), 2.0f);
-        g.setColour(Colours::ridge.brighter(0.4f));
+        // A ringing string only catches a little more light on its ridge.
+        g.setColour(Colours::ridge.brighter(0.4f).interpolatedWith(Colours::ringing, level * 0.8f));
         g.fillRect(area.getX(), y, area.getWidth(), 1.0f);
-
-        if (level > 0.01f)
-        {
-            // A ringing string glows warm, like light under the plate.
-            for (int i = 3; i > 0; --i)
-            {
-                g.setColour(Colours::glow.withAlpha(level * 0.14f * (float) (4 - i)));
-                g.fillRoundedRectangle(area.getX(), y - 1.0f - (float) i * 2.5f, area.getWidth(), (float) i * 5.0f + 1.0f, (float) i * 2.5f);
-            }
-            g.setColour(Colours::glow.withAlpha(level));
-            g.fillRect(area.getX(), y - 1.0f, area.getWidth(), 1.6f);
-        }
     }
 }
 
@@ -367,14 +356,92 @@ RasguidoEditor::RasguidoEditor(RasguidoProcessor& p) : AudioProcessorEditor(&p),
 
     addAndMakeVisible(grid);
     addAndMakeVisible(plate);
+    setWantsKeyboardFocus(true);
     setSize(1060, 620);
     startTimerHz(40);
 }
 
-RasguidoEditor::~RasguidoEditor() { setLookAndFeel(nullptr); }
+RasguidoEditor::~RasguidoEditor()
+{
+    releaseKeys();
+    setLookAndFeel(nullptr);
+}
+
+// ---- computer keyboard -------------------------------------------------------------------------
+
+namespace
+{
+// One row per chord type, twelve keys from C to B, laid out for a Latin American keyboard (letters and
+// digits work on any layout). The bottom row only has ten keys, so it stops at A minor 7.
+const char* const keyRows[rasguido::kChordTypes] = {
+    "1234567890'\xc2\xbf", // major: ... 0 ' ¿
+    "qwertyuiop\xc2\xb4+", // minor: ... p ´ +
+    "asdfghjkl\xc3\xb1{}", // seventh: ... l ñ { }
+    "zxcvbnm,.-", // minor seventh
+};
+
+/** The characters of a row, decoded from UTF-8. */
+juce::Array<juce::juce_wchar> rowKeys(int type)
+{
+    juce::Array<juce::juce_wchar> keys;
+    for (auto t = juce::String::fromUTF8(keyRows[type]).getCharPointer(); !t.isEmpty();)
+        keys.add(t.getAndAdvance());
+    return keys;
+}
+
+/** The chord code a typed character plays, or -1. */
+int codeForKey(juce::juce_wchar c)
+{
+    c = juce::CharacterFunctions::toLowerCase(c);
+    for (int type = 0; type < rasguido::kChordTypes; ++type)
+        if (const int root = rowKeys(type).indexOf(c); root >= 0)
+            return root + 12 * type;
+    return -1;
+}
+} // namespace
+
+bool RasguidoEditor::keyPressed(const juce::KeyPress& key)
+{
+    // Swallow mapped keys (including auto-repeat) so the host doesn't act on them too.
+    return codeForKey(key.getTextCharacter()) >= 0;
+}
+
+bool RasguidoEditor::keyStateChanged(bool)
+{
+    bool handled = false;
+    for (int type = 0; type < rasguido::kChordTypes; ++type)
+    {
+        const auto keys = rowKeys(type);
+        for (int root = 0; root < keys.size(); ++root)
+        {
+            const int code = root + 12 * type;
+            const bool down = juce::KeyPress::isKeyCurrentlyDown((int) keys[root]);
+            if (down == keysDown[(size_t) code])
+                continue;
+            keysDown[(size_t) code] = down;
+            processor.playFromUi(down ? noteOn(rasguido::kFirstChordNote + code, 1.0f) : noteOff(rasguido::kFirstChordNote + code));
+            handled = true;
+        }
+    }
+    return handled;
+}
+
+void RasguidoEditor::releaseKeys()
+{
+    for (size_t code = 0; code < keysDown.size(); ++code)
+        if (std::exchange(keysDown[code], false))
+            processor.playFromUi(noteOff(rasguido::kFirstChordNote + (int) code));
+}
 
 void RasguidoEditor::refreshFromEngine()
 {
+    // Take keyboard focus once the window is up, so typing plays chords straight away.
+    if (!focusGrabbed && isShowing())
+    {
+        grabKeyboardFocus();
+        focusGrabbed = true;
+    }
+
     const auto& engine = processor.engine();
     const int held = engine.heldChordCode(), memory = engine.stringChordCode();
     grid.show(held, memory);
@@ -479,6 +546,8 @@ void RasguidoEditor::paint(juce::Graphics& g)
     // How to play it from a DAW, printed small along the bottom edge.
     g.setColour(Colours::printSoft);
     g.setFont(font(10.5f));
+    g.drawText(juce::String::fromUTF8("TECLADO: 1-0 mayor \xc2\xb7 Q-P menor \xc2\xb7 A-\xc3\x91 7 \xc2\xb7 Z-M m7"),
+               juce::Rectangle<float>(left, (float) getHeight() - 52, 640, 16), juce::Justification::centredLeft);
     g.drawText(juce::String::fromUTF8("MIDI: C1 mayor \xc2\xb7 C2 menor \xc2\xb7 C3 7 \xc2\xb7 C4 m7 \xc2\xb7 C5-C6 cuerdas \xc2\xb7 rueda de modulaci\xc3\xb3n = rasgueo"),
                juce::Rectangle<float>(left, (float) getHeight() - 36, 640, 16), juce::Justification::centredLeft);
 }

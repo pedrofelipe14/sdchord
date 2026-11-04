@@ -67,5 +67,5 @@ cmake -S dsp -B dsp/build && cmake --build dsp/build --config Release && dsp/bui
 ## Próximos pasos
 
 - [ ] Sección rítmica: patrones de batería con un bajo automático que sigue al acorde.
-- [ ] Tocar con el teclado de la computadora en la versión standalone.
+- [x] Tocar con el teclado de la compu: 1-0 mayor, Q-P menor, A-Ñ 7, Z-M m7 (teclado latinoamericano).
 - [ ] La versión web: el mismo `dsp/` compilado a WebAssembly, para tocar desde el celular.

@@ -82,8 +82,17 @@ public:
     /** Pulls the engine's state into the UI (the timer calls it 40 times a second). */
     void refreshFromEngine();
 
+    // Computer keyboard: each row of keys is one chord type, left to right from C.
+    bool keyPressed(const juce::KeyPress&) override;
+    bool keyStateChanged(bool isKeyDown) override;
+    void focusLost(FocusChangeType) override { releaseKeys(); }
+
 private:
     void timerCallback() override { refreshFromEngine(); }
+    void releaseKeys();
+
+    std::array<bool, 12 * rasguido::kChordTypes> keysDown {};
+    bool focusGrabbed = false;
 
     struct Knob
     {
