@@ -2,9 +2,9 @@
 
 # SDChord
 
-**An omnichord-style electronic instrument as a VST3 plugin: hold a chord button, strum the plate, and every string plays a note of that chord.**
+**Un instrumento electrónico estilo omnichord en formato VST3: mantenés un botón de acorde, rasgueás la franja y cada cuerda toca una nota de ese acorde.**
 
-**English** · [Español](README.es.md)
+**Español** · [English](README.en.md)
 
 [![Build](https://github.com/pedrofelipe14/sdchord/actions/workflows/build.yml/badge.svg)](https://github.com/pedrofelipe14/sdchord/actions/workflows/build.yml)
 ![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white)
@@ -13,78 +13,78 @@
 ![pluginval](https://img.shields.io/badge/pluginval-strictness_10-2ea44f)
 ![WebAssembly](https://img.shields.io/badge/WebAssembly-654FF0?logo=webassembly&logoColor=white)
 
-![SDChord playing A minor 7 after a strum](docs/screenshot.png)
+![SDChord tocando La menor 7 después de un rasgueo](docs/screenshot.png)
 
-**▶ [Play it in your browser](https://pedrofelipe14.github.io/sdchord/)**: the same C++ engine compiled to WebAssembly, on desktop or phone.
+**▶ [Tocalo en el navegador](https://pedrofelipe14.github.io/sdchord/)**: el mismo motor en C++ compilado a WebAssembly, en la compu o en el celu.
 
 </div>
 
-## How it plays
+## Cómo se toca
 
-- **Chord buttons:** 12 roots × 4 chord types (major, minor, 7, m7). While you hold one, its chord sounds as a soft organ-like pad with the root in the bass. Slide onto another button to change chords; let go and the previous held chord comes back.
-- **Strum plate:** 13 strings, lowest at the bottom. Touch a string to pluck it or drag across them to strum; faster strums play louder. Each string plays the next tone of the current chord, so every strum is in tune. The strings keep the last chord after you let go of its button.
-- **Sound:** strings are a two-operator FM voice whose brightness fades faster than its body, so they start glassy and ring out mellow. Controls cover levels, string sustain and brightness, chorus, reverb and *wobble*, a tape-like pitch drift.
+- **Botones de acorde:** 12 tonalidades × 4 tipos (mayor, menor, 7 y m7). Mientras mantenés uno, suena su acorde como un colchón suave tipo órgano, con la fundamental en el bajo. Deslizá hasta otro botón para cambiar de acorde; si lo soltás, vuelve el que tenías apretado antes.
+- **Franja de rasgueo:** 13 cuerdas, la más grave abajo. Tocá una para pulsarla o arrastrá sobre varias para rasguear; cuanto más rápido, más fuerte. Cada cuerda toca la siguiente nota del acorde, así que todo rasgueo suena afinado. Las cuerdas se quedan con el último acorde aunque sueltes el botón.
+- **Sonido:** las cuerdas son una voz FM de dos operadores cuyo brillo se apaga antes que el cuerpo: arrancan cristalinas y se van apagando suaves. Hay controles de niveles, sustain y brillo de las cuerdas, chorus, reverb y *wobble*, una desafinación lenta tipo cinta.
 
-- **Auto-strum:** a sequencer that plays the strings by itself, in time, while you hold a chord. It has five patterns (up, down, up and down, full strum alternating down and up strokes, random), quarter to sixteenth-note steps including triplets, and a range that sets how many strings it uses. The first step of each beat is accented. It follows the DAW's tempo with SYNC on. Space switches it on and off.
+- **Rasgueo automático:** un secuenciador que toca las cuerdas solo, a tempo, mientras mantenés un acorde. Tiene cinco patrones (arriba, abajo, ida y vuelta, rasgueo completo alternando bajada y subida, y al azar), figuras de negra a semicorchea con tresillos, y un rango que define cuántas cuerdas usa. El primer paso de cada tiempo va acentuado. Con SYNC sigue el tempo del DAW. La barra espaciadora lo prende y lo apaga.
 
-- **Rhythm machine (web version):** eight preset one-bar rhythms in the style of the old preset rhythm boxes (rock, disco, ballad, bossa nova, cumbia, rumba, waltz, swing). Every drum is synthesised, with no samples: kick, snare, rim, open and closed hats, two congas and a cowbell. It shares the tempo with the auto-strum, and while it runs it is the clock, so the strums lock to its grid. Enter starts and stops it.
+- **Caja de ritmos (versión web):** ocho ritmos de un compás, preprogramados al estilo de las cajas de ritmo viejas (rock, disco, balada, bossa nova, cumbia, rumba, vals y swing). Cada sonido de batería es sintetizado, sin samples: bombo, redoblante, aro, hi-hat abierto y cerrado, dos congas y cencerro. Comparte el tempo con el rasgueo automático y, mientras suena, marca el pulso: los rasgueos se enganchan a su grilla. Enter la arranca y la frena.
 
-### Computer keyboard
+### Teclado de la compu
 
-`1`–`0` major · `Q`–`P` minor · `A`–`Ñ` seventh · `Z`–`M` minor seventh (from C, left to right, Latin American layout) · space: auto-strum · enter: rhythm machine (web).
+`1`–`0` mayor · `Q`–`P` menor · `A`–`Ñ` séptima · `Z`–`M` menor séptima (desde C, de izquierda a derecha, teclado latinoamericano) · espacio: rasgueo automático · enter: caja de ritmos (web).
 
-### From a DAW (MIDI)
+### Desde un DAW (MIDI)
 
-| Notes | Plays |
+| Notas | Toca |
 |---|---|
-| C1–B1 | Major chord on that root |
-| C2–B2 | Minor |
-| C3–B3 | Seventh |
-| C4–B4 | Minor seventh |
-| C5–C6 | Strings 1–13 |
-| CC1 (mod wheel) | Sweeps across the strings like a finger on the plate |
+| C1–B1 | Acorde mayor en esa tonalidad |
+| C2–B2 | Menor |
+| C3–B3 | Séptima |
+| C4–B4 | Menor séptima |
+| C5–C6 | Cuerdas 1 a 13 |
+| CC1 (rueda de modulación) | Recorre las cuerdas como un dedo sobre la franja |
 
-## How it's built
+## Cómo está hecho
 
 ```
-dsp/      the instrument: header-only C++17, no JUCE, so the plugin and the web share it
-  include/sdchord/chords.h    chords, voicings, the MIDI layout
-  include/sdchord/voices.h    pad, bass and FM string voices
-  include/sdchord/effects.h   chorus and a small Freeverb-style reverb
-  include/sdchord/engine.h    held-chord stack, strum logic, the auto-strum sequencer, the shared clock, mixing
-  include/sdchord/rhythm.h    the rhythm machine: synthesised drum voices and the preset patterns
-  tests/                       28 native tests
-plugin/   JUCE wrapper and the editor, drawn as 1980s hardware (orange body, LED readout, ribbed plate)
-tools/    an off-screen renderer that takes the screenshot above
-dsp/src/wasm_api.cpp + scripts/build-wasm.sh   a C API over the engine, built into a 23 KB .wasm with no JS glue
-web/      the browser version: React + TypeScript, the engine in an AudioWorklet
+dsp/      el instrumento: C++17 header-only, sin JUCE, así lo comparten el plugin y la web
+  include/sdchord/chords.h    acordes, voicings y el mapeo MIDI
+  include/sdchord/voices.h    voces de colchón, bajo y cuerdas FM
+  include/sdchord/effects.h   chorus y una reverb chica estilo Freeverb
+  include/sdchord/engine.h    pila de acordes apretados, lógica de rasgueo, el secuenciador, el reloj compartido y la mezcla
+  include/sdchord/rhythm.h    la caja de ritmos: voces de batería sintetizadas y los patrones
+  tests/                       28 tests nativos
+plugin/   la capa JUCE y el editor, dibujado como hardware de los 80 (cuerpo naranja, display de LEDs, placa ranurada)
+tools/    un renderizador fuera de pantalla que saca la captura de arriba
+dsp/src/wasm_api.cpp + scripts/build-wasm.sh   una API en C sobre el motor, compilada a un .wasm de 23 KB sin JS generado
+web/      la versión para navegador: React + TypeScript, con el motor en un AudioWorklet
 ```
 
-- **The UI plays through MIDI too.** Chord buttons and the strum plate send the same note messages a DAW would, through a thread-safe queue. So mouse, touch and MIDI share a single code path, and the tests exercise it.
-- **Sample-accurate.** The processor renders up to each MIDI event and then applies it, so a strum keeps its timing inside a block.
-- **Nothing allocates on the audio thread.** Delay lines are fixed-size arrays, and the UI reads the engine's state (held chord, string glow) from atomics.
-- **Validated like a DAW would load it:** CI runs [pluginval](https://github.com/Tracktion/pluginval) at its strictest level (10) on every push: different sample rates and block sizes, state save and restore, automation, parameter fuzzing, and opening the editor while audio runs.
-- **One engine, two homes.** The browser runs the very same `dsp/` code: the AudioWorklet instantiates the .wasm directly, sends notes and parameters as messages, and gets back the held chord and each string's level to draw. The page has multi-touch chord keys you can slide across, a strum plate that turns sideways on phones, the computer keyboard by physical key position (any layout), and Web MIDI controllers. Its 14 tests include the compiled engine itself, and a check that the parameter ids match the C++.
-- **Tested without a DAW:** the auto-strum's timing at every step length and the order of every pattern, chord voicings, the MIDI layout, the held-chord stack, strums crossing the right strings, decay times that don't depend on the sample rate, and a stress test with everything at maximum that stays finite and below full scale.
+- **La interfaz también toca por MIDI.** Los botones y la franja mandan los mismos mensajes de nota que mandaría un DAW, por una cola segura entre hilos. Así, mouse, touch y MIDI comparten un solo camino de código, y los tests lo cubren.
+- **Precisión de muestra.** El procesador renderiza hasta cada evento MIDI y recién ahí lo aplica, así que un rasgueo mantiene su tiempo dentro de un bloque.
+- **Nada reserva memoria en el hilo de audio.** Las líneas de delay son arrays de tamaño fijo, y la interfaz lee el estado del motor (acorde apretado, brillo de cada cuerda) desde atomics.
+- **Validado como lo cargaría un DAW:** el CI corre [pluginval](https://github.com/Tracktion/pluginval) en su nivel más estricto (10) en cada push: distintos sample rates y tamaños de bloque, guardar y restaurar estado, automatización, valores aleatorios en los parámetros y abrir el editor mientras procesa audio.
+- **Un motor, dos casas.** El navegador corre exactamente el mismo código de `dsp/`: el AudioWorklet instancia el .wasm directamente, le manda notas y parámetros como mensajes, y recibe el acorde apretado y el nivel de cada cuerda para dibujarlos. La página tiene teclas de acorde multitouch por las que se puede deslizar el dedo, una franja que en el celu se pone horizontal, el teclado de la compu por posición física de la tecla (sirve para cualquier distribución) y controladores Web MIDI. Sus 14 tests incluyen el motor compilado y un chequeo de que los IDs de parámetros coincidan con los del C++.
+- **Testeado sin DAW:** el tempo del rasgueo automático en cada figura y el orden de cada patrón, los voicings, el mapeo MIDI, la pila de acordes, que un rasgueo pulse las cuerdas correctas, que el decay no dependa del sample rate, y una prueba de estrés con todo al máximo que no da valores inválidos ni llega a saturar.
 
-## Building
+## Compilar
 
-Needs CMake 3.22+ and Visual Studio 2022 (or another C++17 compiler). JUCE is a submodule.
+Hace falta CMake 3.22+ y Visual Studio 2022 (u otro compilador C++17). JUCE es un submódulo.
 
 ```sh
 git clone --recursive https://github.com/pedrofelipe14/sdchord.git
 cmake -B build
 cmake --build build --config Release --target SDChord_All
-# Web version (needs Emscripten and Node):
+# Versión web (necesita Emscripten y Node):
 ./scripts/build-wasm.sh && cd web && npm install && npm run dev
-# DSP tests only:
+# Solo los tests del DSP:
 cmake -S dsp -B dsp/build && cmake --build dsp/build --config Release && dsp/build/Release/dsp_tests
 ```
 
-## Roadmap
+## Próximos pasos
 
-- [x] Auto-strum sequencer.
-- [x] A rhythm machine with preset patterns, locked to the auto-strum (web version).
-- [ ] An auto-bass that follows the chord in time with the drums.
-- [x] Computer-keyboard play: 1-0 major, Q-P minor, A-Ñ 7, Z-M m7 (Latin American layout).
-- [x] The web version: the same `dsp/` compiled to WebAssembly, playable on a phone.
+- [x] Rasgueo automático (secuenciador).
+- [x] Caja de ritmos con patrones preprogramados, sincronizada con el rasgueo automático (versión web).
+- [ ] Un bajo automático que siga al acorde a tempo con la batería.
+- [x] Tocar con el teclado de la compu: 1-0 mayor, Q-P menor, A-Ñ 7, Z-M m7 (teclado latinoamericano).
+- [x] La versión web: el mismo `dsp/` compilado a WebAssembly, para tocar desde el celular.
