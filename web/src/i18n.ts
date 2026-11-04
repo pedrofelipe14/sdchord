@@ -76,7 +76,7 @@ export type Strings = (typeof STRINGS)['es']
 
 export function initialLang(): Lang {
   try {
-    const saved = localStorage.getItem('pedrochord-lang')
+    const saved = localStorage.getItem('sdchord-lang')
     if (saved === 'es' || saved === 'en') return saved
   } catch {
     // storage blocked: use the browser language
@@ -86,7 +86,7 @@ export function initialLang(): Lang {
 
 export function saveLang(lang: Lang): void {
   try {
-    localStorage.setItem('pedrochord-lang', lang)
+    localStorage.setItem('sdchord-lang', lang)
   } catch {
     // fine if it can't be remembered
   }

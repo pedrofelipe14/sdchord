@@ -8,9 +8,9 @@
 #include <string>
 #include <vector>
 
-#include "pedrochord/engine.h"
+#include "sdchord/engine.h"
 
-using namespace pedrochord;
+using namespace sdchord;
 
 namespace
 {

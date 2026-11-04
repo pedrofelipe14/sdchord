@@ -41,7 +41,7 @@ export const PATTERNS: Record<Lang, string[]> = {
 }
 export const RATES = ['1/4', '1/8', '1/8 T', '1/16']
 
-/** The rhythm machine's presets, in engine order (dsp/include/pedrochord/rhythm.h; a test checks the shape). */
+/** The rhythm machine's presets, in engine order (dsp/include/sdchord/rhythm.h; a test checks the shape). */
 export const RHYTHMS: { name: Record<Lang, string>; length: number; stepsPerBeat: number }[] = [
   { name: { es: 'Rock', en: 'Rock' }, length: 16, stepsPerBeat: 4 },
   { name: { es: 'Disco', en: 'Disco' }, length: 16, stepsPerBeat: 4 },

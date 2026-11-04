@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(pedrochord_dsp CXX)
+project(sdchord_dsp CXX)
 
 # Native build of the DSP tests. The plugin is built from the root CMakeLists.txt.
 

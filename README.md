@@ -1,21 +1,21 @@
 <div align="center">
 
-# Pedrochord
+# SDChord
 
 **An omnichord-style electronic instrument as a VST3 plugin: hold a chord button, strum the plate, and every string plays a note of that chord.**
 
 **English** · [Español](README.es.md)
 
-[![Build](https://github.com/pedrofelipe14/pedrochord/actions/workflows/build.yml/badge.svg)](https://github.com/pedrofelipe14/pedrochord/actions/workflows/build.yml)
+[![Build](https://github.com/pedrofelipe14/sdchord/actions/workflows/build.yml/badge.svg)](https://github.com/pedrofelipe14/sdchord/actions/workflows/build.yml)
 ![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white)
 ![JUCE](https://img.shields.io/badge/JUCE-9-8DC63F)
 ![VST3](https://img.shields.io/badge/VST3-Standalone-555)
 ![pluginval](https://img.shields.io/badge/pluginval-strictness_10-2ea44f)
 ![WebAssembly](https://img.shields.io/badge/WebAssembly-654FF0?logo=webassembly&logoColor=white)
 
-![Pedrochord playing A minor 7 after a strum](docs/screenshot.png)
+![SDChord playing A minor 7 after a strum](docs/screenshot.png)
 
-**▶ [Play it in your browser](https://pedrofelipe14.github.io/pedrochord/)**: the same C++ engine compiled to WebAssembly, on desktop or phone.
+**▶ [Play it in your browser](https://pedrofelipe14.github.io/sdchord/)**: the same C++ engine compiled to WebAssembly, on desktop or phone.
 
 </div>
 
@@ -48,11 +48,11 @@
 
 ```
 dsp/      the instrument: header-only C++17, no JUCE, so the plugin and the web share it
-  include/pedrochord/chords.h    chords, voicings, the MIDI layout
-  include/pedrochord/voices.h    pad, bass and FM string voices
-  include/pedrochord/effects.h   chorus and a small Freeverb-style reverb
-  include/pedrochord/engine.h    held-chord stack, strum logic, the auto-strum sequencer, the shared clock, mixing
-  include/pedrochord/rhythm.h    the rhythm machine: synthesised drum voices and the preset patterns
+  include/sdchord/chords.h    chords, voicings, the MIDI layout
+  include/sdchord/voices.h    pad, bass and FM string voices
+  include/sdchord/effects.h   chorus and a small Freeverb-style reverb
+  include/sdchord/engine.h    held-chord stack, strum logic, the auto-strum sequencer, the shared clock, mixing
+  include/sdchord/rhythm.h    the rhythm machine: synthesised drum voices and the preset patterns
   tests/                       28 native tests
 plugin/   JUCE wrapper and the editor, drawn as 1980s hardware (orange body, LED readout, ribbed plate)
 tools/    an off-screen renderer that takes the screenshot above
@@ -72,9 +72,9 @@ web/      the browser version: React + TypeScript, the engine in an AudioWorklet
 Needs CMake 3.22+ and Visual Studio 2022 (or another C++17 compiler). JUCE is a submodule.
 
 ```sh
-git clone --recursive https://github.com/pedrofelipe14/pedrochord.git
+git clone --recursive https://github.com/pedrofelipe14/sdchord.git
 cmake -B build
-cmake --build build --config Release --target Pedrochord_All
+cmake --build build --config Release --target SDChord_All
 # Web version (needs Emscripten and Node):
 ./scripts/build-wasm.sh && cd web && npm install && npm run dev
 # DSP tests only:

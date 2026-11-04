@@ -93,14 +93,14 @@ void drawKey(juce::Graphics& g, juce::Rectangle<float> key, bool down, const juc
 
 // ---- look and feel -----------------------------------------------------------------------------
 
-PedrochordLook::PedrochordLook()
+SDChordLook::SDChordLook()
 {
     setColour(juce::BubbleComponent::backgroundColourId, Colours::ledWindow);
     setColour(juce::BubbleComponent::outlineColourId, Colours::print);
     setColour(juce::TooltipWindow::textColourId, Colours::ledOn);
 }
 
-void PedrochordLook::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h, float pos, float start, float end, juce::Slider& slider)
+void SDChordLook::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h, float pos, float start, float end, juce::Slider& slider)
 {
     const auto area = juce::Rectangle<int>(x, y, w, h).toFloat();
     const float radius = juce::jmin(area.getWidth(), area.getHeight()) * 0.5f;
@@ -144,7 +144,7 @@ void PedrochordLook::drawRotarySlider(juce::Graphics& g, int x, int y, int w, in
     g.drawLine(juce::Line<float>(centre.getPointOnCircumference(cap * 0.25f, angle), centre.getPointOnCircumference(cap - 1.5f, angle)), 2.2f);
 }
 
-void PedrochordLook::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b, bool, bool down)
+void SDChordLook::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b, bool, bool down)
 {
     const bool on = b.getToggleState();
     drawKey(g, b.getLocalBounds().toFloat().reduced(3.0f, 2.0f).withTrimmedBottom(5.0f), down || on, b.getButtonText(), on ? 1.0f : 0.0f, 12.0f);
@@ -155,7 +155,7 @@ void PedrochordLook::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b, 
 juce::Rectangle<float> ChordGrid::cellBounds(int root, int type) const
 {
     const float w = ((float) getWidth() - labelWidth) / 12.0f;
-    const float h = (float) getHeight() / (float) pedrochord::kChordTypes;
+    const float h = (float) getHeight() / (float) sdchord::kChordTypes;
     return { labelWidth + w * (float) root, h * (float) type, w, h };
 }
 
@@ -164,7 +164,7 @@ int ChordGrid::codeAt(juce::Point<float> p) const
     if (p.x < labelWidth || !getLocalBounds().toFloat().contains(p))
         return -1;
     const int root = juce::jlimit(0, 11, (int) ((p.x - labelWidth) / (((float) getWidth() - labelWidth) / 12.0f)));
-    const int type = juce::jlimit(0, pedrochord::kChordTypes - 1, (int) (p.y / ((float) getHeight() / pedrochord::kChordTypes)));
+    const int type = juce::jlimit(0, sdchord::kChordTypes - 1, (int) (p.y / ((float) getHeight() / sdchord::kChordTypes)));
     return root + 12 * type;
 }
 
@@ -172,7 +172,7 @@ void ChordGrid::paint(juce::Graphics& g)
 {
     drawRecess(g, getLocalBounds().toFloat().withTrimmedLeft(labelWidth - 8.0f), 10.0f);
 
-    for (int type = 0; type < pedrochord::kChordTypes; ++type)
+    for (int type = 0; type < sdchord::kChordTypes; ++type)
     {
         const auto row = cellBounds(0, type);
         g.setColour(Colours::print);
@@ -197,13 +197,13 @@ void ChordGrid::press(int source, int code)
     {
         if (it->second == code)
             return;
-        processor.playFromUi(noteOff(pedrochord::kFirstChordNote + it->second));
+        processor.playFromUi(noteOff(sdchord::kFirstChordNote + it->second));
         pressed.erase(it);
     }
     if (code >= 0)
     {
         pressed[source] = code;
-        processor.playFromUi(noteOn(pedrochord::kFirstChordNote + code, 1.0f));
+        processor.playFromUi(noteOn(sdchord::kFirstChordNote + code, 1.0f));
     }
 }
 
@@ -211,7 +211,7 @@ void ChordGrid::release(int source)
 {
     if (auto it = pressed.find(source); it != pressed.end())
     {
-        processor.playFromUi(noteOff(pedrochord::kFirstChordNote + it->second));
+        processor.playFromUi(noteOff(sdchord::kFirstChordNote + it->second));
         pressed.erase(it);
     }
 }
@@ -246,14 +246,14 @@ float StrumPlate::positionAt(float y) const
 
 void StrumPlate::pluck(int string, float velocity)
 {
-    processor.playFromUi(noteOn(pedrochord::noteForString(string), velocity));
+    processor.playFromUi(noteOn(sdchord::noteForString(string), velocity));
 }
 
 void StrumPlate::mouseDown(const juce::MouseEvent& e)
 {
     const float p = positionAt(e.position.y);
     fingers[e.source.getIndex()] = { p, juce::Time::getMillisecondCounterHiRes() };
-    pluck(juce::jlimit(0, pedrochord::kStrings - 1, (int) (p * pedrochord::kStrings)), 0.75f);
+    pluck(juce::jlimit(0, sdchord::kStrings - 1, (int) (p * sdchord::kStrings)), 0.75f);
 }
 
 void StrumPlate::mouseDrag(const juce::MouseEvent& e)
@@ -271,9 +271,9 @@ void StrumPlate::mouseDrag(const juce::MouseEvent& e)
     const float velocity = juce::jlimit(0.3f, 1.0f, 0.35f + speed * 0.12f);
 
     const float lo = juce::jmin(finger.position, p), hi = juce::jmax(finger.position, p);
-    for (int s = 0; s < pedrochord::kStrings; ++s)
+    for (int s = 0; s < sdchord::kStrings; ++s)
     {
-        const float centre = ((float) s + 0.5f) / (float) pedrochord::kStrings;
+        const float centre = ((float) s + 0.5f) / (float) sdchord::kStrings;
         if (centre > lo && centre <= hi)
             pluck(s, velocity);
     }
@@ -287,7 +287,7 @@ void StrumPlate::refresh()
     const auto& engine = processor.engine();
     bool changed = engine.stringChordCode() != chordCode;
     chordCode = engine.stringChordCode();
-    for (int s = 0; s < pedrochord::kStrings; ++s)
+    for (int s = 0; s < sdchord::kStrings; ++s)
     {
         const float level = engine.stringGlow(s);
         changed = changed || std::abs(level - glow[(size_t) s]) > 0.003f;
@@ -319,11 +319,11 @@ void StrumPlate::paint(juce::Graphics& g)
     g.fillRoundedRectangle(plate, 7.0f);
 
     const auto area = stringArea();
-    const float gap = area.getHeight() / (float) pedrochord::kStrings;
+    const float gap = area.getHeight() / (float) sdchord::kStrings;
     const int code = juce::jmax(0, chordCode);
-    const auto notes = pedrochord::stringNotes({ code % 12, static_cast<pedrochord::ChordType>(code / 12) });
+    const auto notes = sdchord::stringNotes({ code % 12, static_cast<sdchord::ChordType>(code / 12) });
 
-    for (int s = 0; s < pedrochord::kStrings; ++s)
+    for (int s = 0; s < sdchord::kStrings; ++s)
     {
         const float y = area.getBottom() - gap * ((float) s + 0.5f);
         const float level = juce::jlimit(0.0f, 1.0f, glow[(size_t) s] * 1.6f);
@@ -343,7 +343,7 @@ void StrumPlate::paint(juce::Graphics& g)
 
 // ---- editor ------------------------------------------------------------------------------------
 
-PedrochordEditor::PedrochordEditor(PedrochordProcessor& p) : AudioProcessorEditor(&p), processor(p), grid(p), plate(p)
+SDChordEditor::SDChordEditor(SDChordProcessor& p) : AudioProcessorEditor(&p), processor(p), grid(p), plate(p)
 {
     setLookAndFeel(&look);
 
@@ -399,12 +399,12 @@ PedrochordEditor::PedrochordEditor(PedrochordProcessor& p) : AudioProcessorEdito
     keyPoller.startTimer(4);
 }
 
-PedrochordEditor::~PedrochordEditor()
+SDChordEditor::~SDChordEditor()
 {
     keyPoller.stopTimer();
     for (size_t code = 0; code < keysDown.size(); ++code)
         if (keysDown[code])
-            processor.playFromUi(noteOff(pedrochord::kFirstChordNote + (int) code));
+            processor.playFromUi(noteOff(sdchord::kFirstChordNote + (int) code));
     setLookAndFeel(nullptr);
 }
 
@@ -416,9 +416,9 @@ using KeyRow = std::array<juce::juce_wchar, 12>;
 
 /** One row per chord type, twelve keys from C to B, laid out for a Latin American keyboard (letters and
     digits work on any layout). The bottom row only has ten keys, so it stops at A minor 7 (0 = no key). */
-const std::array<KeyRow, pedrochord::kChordTypes>& keyRows()
+const std::array<KeyRow, sdchord::kChordTypes>& keyRows()
 {
-    static const std::array<KeyRow, pedrochord::kChordTypes> rows {
+    static const std::array<KeyRow, sdchord::kChordTypes> rows {
         KeyRow { '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '\'', 0xbf }, // ... 0 ' ¿
         KeyRow { 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', 0xb4, '+' }, //  ... p ´ +
         KeyRow { 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 0xf1, '{', '}' }, //  ... l ñ { }
@@ -437,7 +437,7 @@ bool isMappedKey(juce::juce_wchar c)
 }
 } // namespace
 
-bool PedrochordEditor::keyPressed(const juce::KeyPress& key)
+bool SDChordEditor::keyPressed(const juce::KeyPress& key)
 {
     if (key == juce::KeyPress::spaceKey) // space switches the auto-strum on and off
     {
@@ -449,13 +449,13 @@ bool PedrochordEditor::keyPressed(const juce::KeyPress& key)
     return !key.getModifiers().isCommandDown() && isMappedKey(key.getTextCharacter());
 }
 
-bool PedrochordEditor::keyStateChanged(bool)
+bool SDChordEditor::keyStateChanged(bool)
 {
     pollKeys(); // react to the event right away; the poller covers anything the events miss
     return std::any_of(keysDown.begin(), keysDown.end(), [](bool down) { return down; });
 }
 
-void PedrochordEditor::pollKeys()
+void SDChordEditor::pollKeys()
 {
     // Only while this editor has the keyboard: typing elsewhere must not play, and losing focus with
     // keys held lets them go. Ctrl/Alt shortcuts (Ctrl+S in a DAW...) never play chords.
@@ -463,7 +463,7 @@ void PedrochordEditor::pollKeys()
     const bool active = isShowing() && hasKeyboardFocus(true) && !mods.isCommandDown() && !mods.isAltDown();
 
     const auto& rows = keyRows();
-    for (int type = 0; type < pedrochord::kChordTypes; ++type)
+    for (int type = 0; type < sdchord::kChordTypes; ++type)
     {
         for (int root = 0; root < 12; ++root)
         {
@@ -475,12 +475,12 @@ void PedrochordEditor::pollKeys()
             if (down == keysDown[(size_t) code])
                 continue;
             keysDown[(size_t) code] = down;
-            processor.playFromUi(down ? noteOn(pedrochord::kFirstChordNote + code, 1.0f) : noteOff(pedrochord::kFirstChordNote + code));
+            processor.playFromUi(down ? noteOn(sdchord::kFirstChordNote + code, 1.0f) : noteOff(sdchord::kFirstChordNote + code));
         }
     }
 }
 
-void PedrochordEditor::refreshFromEngine()
+void SDChordEditor::refreshFromEngine()
 {
     // Take keyboard focus once the window is up, so typing plays chords straight away.
     if (!focusGrabbed && isShowing())
@@ -507,14 +507,14 @@ void PedrochordEditor::refreshFromEngine()
     }
 }
 
-juce::String PedrochordEditor::seqReadoutText() const
+juce::String SDChordEditor::seqReadoutText() const
 {
     auto value = [this](const char* id) { return juce::roundToInt(processor.state.getRawParameterValue(id)->load()); };
     return seqPatternNames()[value("seqPattern")].toUpperCase() + "\n" + seqRateNames()[value("seqRate")] + juce::String::fromUTF8(" \xc2\xb7 ")
            + juce::String(juce::roundToInt(processor.autoStrumBpm())) + " BPM" + (value("seqOn") ? "" : " \x01");
 }
 
-void PedrochordEditor::paint(juce::Graphics& g)
+void SDChordEditor::paint(juce::Graphics& g)
 {
     // Behind the instrument, then the body itself with a soft highlight along the top.
     g.fillAll(juce::Colour(0xff2b2420));
@@ -540,7 +540,7 @@ void PedrochordEditor::paint(juce::Graphics& g)
     const float left = 44.0f;
     g.setColour(Colours::print);
     g.setFont(font(34.0f, "Bold Italic"));
-    g.drawText("Pedrochord", juce::Rectangle<float>(left, 22, 240, 44), juce::Justification::centredLeft);
+    g.drawText("SDChord", juce::Rectangle<float>(left, 22, 240, 44), juce::Justification::centredLeft);
     g.setFont(font(11.5f, "Bold"));
     g.setColour(Colours::printSoft);
     g.drawText(juce::String::fromUTF8("ARPA ELECTR\xc3\x93NICA DE ACORDES"), juce::Rectangle<float>(left + 2, 64, 300, 16), juce::Justification::centredLeft);
@@ -648,7 +648,7 @@ void PedrochordEditor::paint(juce::Graphics& g)
                juce::Rectangle<float>(left, (float) getHeight() - 36, 640, 16), juce::Justification::centredLeft);
 }
 
-void PedrochordEditor::resized()
+void SDChordEditor::resized()
 {
     plate.setBounds(getWidth() - 318, 28, 284, getHeight() - 56);
     const int left = 44, right = plate.getX() - 30;

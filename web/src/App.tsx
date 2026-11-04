@@ -3,12 +3,12 @@ import { ChordGrid } from './components/ChordGrid'
 import { Knob } from './components/Knob'
 import { StrumPlate } from './components/StrumPlate'
 import { chordName } from './engine/chords'
-import { type EngineState, PedrochordEngine, silentState } from './engine/engine'
+import { type EngineState, SDChordEngine, silentState } from './engine/engine'
 import { chordForKey } from './engine/keyboard'
 import { defaultValues, type Lang, PARAMS, ParamId, RHYTHMS } from './engine/params'
 import { initialLang, saveLang, STRINGS } from './i18n'
 
-const REPO = 'https://github.com/pedrofelipe14/pedrochord'
+const REPO = 'https://github.com/pedrofelipe14/sdchord'
 
 type KnobKey = keyof (typeof STRINGS)['es']['knobs']
 type SectionKey = keyof (typeof STRINGS)['es']['sections']
@@ -34,7 +34,7 @@ const RHYTHM_KNOBS: [ParamId, KnobKey][] = [
 ]
 
 export default function App() {
-  const engine = useMemo(() => new PedrochordEngine(), [])
+  const engine = useMemo(() => new SDChordEngine(), [])
   const [lang, setLang] = useState<Lang>(initialLang)
   const [values, setValues] = useState(defaultValues)
   const [state, setState] = useState<EngineState>(silentState)
@@ -146,7 +146,7 @@ export default function App() {
       <div className="body">
         <header className="top">
           <div className="brand">
-            <h1>Pedrochord</h1>
+            <h1>SDChord</h1>
             <p className="subtitle">{t.subtitle}</p>
           </div>
           <div className="readout-group">

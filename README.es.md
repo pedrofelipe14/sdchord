@@ -1,21 +1,21 @@
 <div align="center">
 
-# Pedrochord
+# SDChord
 
 **Un instrumento electrónico estilo omnichord en formato VST3: mantenés un botón de acorde, rasgueás la franja y cada cuerda toca una nota de ese acorde.**
 
 [English](README.md) · **Español**
 
-[![Build](https://github.com/pedrofelipe14/pedrochord/actions/workflows/build.yml/badge.svg)](https://github.com/pedrofelipe14/pedrochord/actions/workflows/build.yml)
+[![Build](https://github.com/pedrofelipe14/sdchord/actions/workflows/build.yml/badge.svg)](https://github.com/pedrofelipe14/sdchord/actions/workflows/build.yml)
 ![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white)
 ![JUCE](https://img.shields.io/badge/JUCE-9-8DC63F)
 ![VST3](https://img.shields.io/badge/VST3-Standalone-555)
 ![pluginval](https://img.shields.io/badge/pluginval-strictness_10-2ea44f)
 ![WebAssembly](https://img.shields.io/badge/WebAssembly-654FF0?logo=webassembly&logoColor=white)
 
-![Pedrochord tocando La menor 7 después de un rasgueo](docs/screenshot.png)
+![SDChord tocando La menor 7 después de un rasgueo](docs/screenshot.png)
 
-**▶ [Tocalo en el navegador](https://pedrofelipe14.github.io/pedrochord/)**: el mismo motor en C++ compilado a WebAssembly, en la compu o en el celu.
+**▶ [Tocalo en el navegador](https://pedrofelipe14.github.io/sdchord/)**: el mismo motor en C++ compilado a WebAssembly, en la compu o en el celu.
 
 </div>
 
@@ -48,11 +48,11 @@
 
 ```
 dsp/      el instrumento: C++17 header-only, sin JUCE, así lo comparten el plugin y la web
-  include/pedrochord/chords.h    acordes, voicings y el mapeo MIDI
-  include/pedrochord/voices.h    voces de colchón, bajo y cuerdas FM
-  include/pedrochord/effects.h   chorus y una reverb chica estilo Freeverb
-  include/pedrochord/engine.h    pila de acordes apretados, lógica de rasgueo, el secuenciador, el reloj compartido y la mezcla
-  include/pedrochord/rhythm.h    la caja de ritmos: voces de batería sintetizadas y los patrones
+  include/sdchord/chords.h    acordes, voicings y el mapeo MIDI
+  include/sdchord/voices.h    voces de colchón, bajo y cuerdas FM
+  include/sdchord/effects.h   chorus y una reverb chica estilo Freeverb
+  include/sdchord/engine.h    pila de acordes apretados, lógica de rasgueo, el secuenciador, el reloj compartido y la mezcla
+  include/sdchord/rhythm.h    la caja de ritmos: voces de batería sintetizadas y los patrones
   tests/                       28 tests nativos
 plugin/   la capa JUCE y el editor, dibujado como hardware de los 80 (cuerpo naranja, display de LEDs, placa ranurada)
 tools/    un renderizador fuera de pantalla que saca la captura de arriba
@@ -72,9 +72,9 @@ web/      la versión para navegador: React + TypeScript, con el motor en un Aud
 Hace falta CMake 3.22+ y Visual Studio 2022 (u otro compilador C++17). JUCE es un submódulo.
 
 ```sh
-git clone --recursive https://github.com/pedrofelipe14/pedrochord.git
+git clone --recursive https://github.com/pedrofelipe14/sdchord.git
 cmake -B build
-cmake --build build --config Release --target Pedrochord_All
+cmake --build build --config Release --target SDChord_All
 # Versión web (necesita Emscripten y Node):
 ./scripts/build-wasm.sh && cd web && npm install && npm run dev
 # Solo los tests del DSP:

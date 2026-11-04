@@ -3,13 +3,13 @@
 
 #include <emscripten/emscripten.h>
 
-#include "pedrochord/engine.h"
+#include "sdchord/engine.h"
 
 namespace
 {
 constexpr int maxBlock = 1024;
 
-pedrochord::Engine engine;
+sdchord::Engine engine;
 float outLeft[maxBlock];
 float outRight[maxBlock];
 
@@ -39,14 +39,14 @@ enum ParamId
 
 extern "C"
 {
-EMSCRIPTEN_KEEPALIVE void pc_init(float sampleRate) { engine.prepare(sampleRate); }
+EMSCRIPTEN_KEEPALIVE void sdc_init(float sampleRate) { engine.prepare(sampleRate); }
 
-EMSCRIPTEN_KEEPALIVE void pc_note_on(int note, float velocity) { engine.noteOn(note, velocity); }
-EMSCRIPTEN_KEEPALIVE void pc_note_off(int note) { engine.noteOff(note); }
-EMSCRIPTEN_KEEPALIVE void pc_control_change(int cc, int value) { engine.controlChange(cc, value); }
-EMSCRIPTEN_KEEPALIVE void pc_all_notes_off() { engine.allNotesOff(); }
+EMSCRIPTEN_KEEPALIVE void sdc_note_on(int note, float velocity) { engine.noteOn(note, velocity); }
+EMSCRIPTEN_KEEPALIVE void sdc_note_off(int note) { engine.noteOff(note); }
+EMSCRIPTEN_KEEPALIVE void sdc_control_change(int cc, int value) { engine.controlChange(cc, value); }
+EMSCRIPTEN_KEEPALIVE void sdc_all_notes_off() { engine.allNotesOff(); }
 
-EMSCRIPTEN_KEEPALIVE void pc_set_param(int id, float value)
+EMSCRIPTEN_KEEPALIVE void sdc_set_param(int id, float value)
 {
     auto& p = engine.params;
     switch (id)
@@ -73,27 +73,27 @@ EMSCRIPTEN_KEEPALIVE void pc_set_param(int id, float value)
     }
 }
 
-/** Renders up to maxBlock frames into the buffers returned by pc_left/pc_right. */
-EMSCRIPTEN_KEEPALIVE void pc_process(int numFrames)
+/** Renders up to maxBlock frames into the buffers returned by sdc_left/sdc_right. */
+EMSCRIPTEN_KEEPALIVE void sdc_process(int numFrames)
 {
     if (numFrames > maxBlock)
         numFrames = maxBlock;
     engine.process(outLeft, outRight, numFrames);
 }
 
-EMSCRIPTEN_KEEPALIVE float* pc_left() { return outLeft; }
-EMSCRIPTEN_KEEPALIVE float* pc_right() { return outRight; }
+EMSCRIPTEN_KEEPALIVE float* sdc_left() { return outLeft; }
+EMSCRIPTEN_KEEPALIVE float* sdc_right() { return outRight; }
 
 // State for the UI.
-EMSCRIPTEN_KEEPALIVE int pc_held_chord() { return engine.heldChordCode(); }
-EMSCRIPTEN_KEEPALIVE int pc_string_chord() { return engine.stringChordCode(); }
-EMSCRIPTEN_KEEPALIVE float pc_string_glow(int string) { return engine.stringGlow(string); }
-EMSCRIPTEN_KEEPALIVE int pc_pluck_count() { return engine.pluckCount(); }
-EMSCRIPTEN_KEEPALIVE int pc_rhythm_step() { return engine.rhythmStep(); }
-EMSCRIPTEN_KEEPALIVE int pc_drum_hits() { return engine.drumHits(); }
+EMSCRIPTEN_KEEPALIVE int sdc_held_chord() { return engine.heldChordCode(); }
+EMSCRIPTEN_KEEPALIVE int sdc_string_chord() { return engine.stringChordCode(); }
+EMSCRIPTEN_KEEPALIVE float sdc_string_glow(int string) { return engine.stringGlow(string); }
+EMSCRIPTEN_KEEPALIVE int sdc_pluck_count() { return engine.pluckCount(); }
+EMSCRIPTEN_KEEPALIVE int sdc_rhythm_step() { return engine.rhythmStep(); }
+EMSCRIPTEN_KEEPALIVE int sdc_drum_hits() { return engine.drumHits(); }
 
 // The rhythm patterns' shape, so the page can lay out its step LEDs (a test checks web/src agrees).
-EMSCRIPTEN_KEEPALIVE int pc_rhythm_count() { return pedrochord::kRhythmPatterns; }
-EMSCRIPTEN_KEEPALIVE int pc_rhythm_length(int pattern) { return pedrochord::rhythmPatterns()[(size_t) pattern].length; }
-EMSCRIPTEN_KEEPALIVE int pc_rhythm_steps_per_beat(int pattern) { return pedrochord::rhythmPatterns()[(size_t) pattern].stepsPerBeat; }
+EMSCRIPTEN_KEEPALIVE int sdc_rhythm_count() { return sdchord::kRhythmPatterns; }
+EMSCRIPTEN_KEEPALIVE int sdc_rhythm_length(int pattern) { return sdchord::rhythmPatterns()[(size_t) pattern].length; }
+EMSCRIPTEN_KEEPALIVE int sdc_rhythm_steps_per_beat(int pattern) { return sdchord::rhythmPatterns()[(size_t) pattern].stepsPerBeat; }
 }

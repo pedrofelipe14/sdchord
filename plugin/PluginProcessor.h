@@ -2,16 +2,16 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
-#include "pedrochord/engine.h"
+#include "sdchord/engine.h"
 
 /** Display names of the auto-strum's patterns and step lengths, in engine order. */
 juce::StringArray seqPatternNames();
 juce::StringArray seqRateNames();
 
-class PedrochordProcessor : public juce::AudioProcessor
+class SDChordProcessor : public juce::AudioProcessor
 {
 public:
-    PedrochordProcessor();
+    SDChordProcessor();
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
@@ -39,7 +39,7 @@ public:
         thread only; the audio thread applies it at the start of its next block. */
     void playFromUi(const juce::MidiMessage& message);
 
-    const pedrochord::Engine& engine() const { return dsp; }
+    const sdchord::Engine& engine() const { return dsp; }
     /** The tempo the auto-strum is using: the host's when synced, otherwise the Tempo knob. */
     float autoStrumBpm() const { return currentBpm.load(std::memory_order_relaxed); }
 
@@ -50,7 +50,7 @@ private:
     void handle(const juce::MidiMessage& message);
     void readParams();
 
-    pedrochord::Engine dsp;
+    sdchord::Engine dsp;
     std::atomic<float> currentBpm { 100.0f };
     // Lock-free queue from the editor to the audio thread. (A MidiMessageCollector would keep the
     // events' relative timing, but always at the cost of one extra block of latency.)
@@ -62,5 +62,5 @@ private:
     juce::AbstractFifo uiFifo { uiQueueSize };
     std::array<UiEvent, uiQueueSize> uiEvents {};
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PedrochordProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SDChordProcessor)
 };

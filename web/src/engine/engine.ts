@@ -21,7 +21,7 @@ export const silentState = (): EngineState => ({ held: -1, memory: 0, glow: new 
 /** Main-thread handle on the instrument running in the AudioWorklet.
     Browsers only allow audio after a user gesture, so start() is called from one. Whatever is
     played or set before the engine is up is queued and sent once it is. */
-export class PedrochordEngine {
+export class SDChordEngine {
   private node: AudioWorkletNode | null = null
   private starting: Promise<void> | null = null
   private queue: Message[] = []
@@ -41,11 +41,11 @@ export class PedrochordEngine {
     const context = new AudioContext({ latencyHint: 'interactive' })
     const base = import.meta.env.BASE_URL
     const [wasmBytes] = await Promise.all([
-      fetch(`${base}pedrochord.wasm`).then((r) => r.arrayBuffer()),
-      context.audioWorklet.addModule(`${base}pedrochord-processor.js`),
+      fetch(`${base}sdchord.wasm`).then((r) => r.arrayBuffer()),
+      context.audioWorklet.addModule(`${base}sdchord-processor.js`),
     ])
 
-    const node = new AudioWorkletNode(context, 'pedrochord', {
+    const node = new AudioWorkletNode(context, 'sdchord', {
       numberOfInputs: 0,
       numberOfOutputs: 1,
       outputChannelCount: [2],

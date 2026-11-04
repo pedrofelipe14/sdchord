@@ -1,4 +1,4 @@
-// The chord layout and voicings, mirroring dsp/include/pedrochord/chords.h (tests check the same cases).
+// The chord layout and voicings, mirroring dsp/include/sdchord/chords.h (tests check the same cases).
 
 export const CHORD_TYPES = 4
 export const STRINGS = 13

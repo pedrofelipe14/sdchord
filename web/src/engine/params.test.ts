@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { clampParam, defaultValues, PARAM_COUNT, PARAMS, ParamId } from './params'
 
 const wasmApi = readFileSync(new URL('../../../dsp/src/wasm_api.cpp', import.meta.url), 'utf8')
-const engineHeader = readFileSync(new URL('../../../dsp/include/pedrochord/engine.h', import.meta.url), 'utf8')
+const engineHeader = readFileSync(new URL('../../../dsp/include/sdchord/engine.h', import.meta.url), 'utf8')
 
 describe('parameters', () => {
   it('use the same ids, in the same order, as the C++ side', () => {

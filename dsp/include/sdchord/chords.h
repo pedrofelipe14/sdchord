@@ -4,7 +4,7 @@
 
 #include <array>
 
-namespace pedrochord
+namespace sdchord
 {
 enum class ChordType
 {
@@ -112,4 +112,4 @@ inline int stringForNote(int note)
 }
 
 inline int noteForString(int string) { return kFirstStringNote + string; }
-} // namespace pedrochord
+} // namespace sdchord

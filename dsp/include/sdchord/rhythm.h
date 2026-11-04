@@ -9,7 +9,7 @@
 
 #include "voices.h"
 
-namespace pedrochord
+namespace sdchord
 {
 enum Drum
 {
@@ -202,4 +202,4 @@ private:
     Rng rng { 0x1234567u };
     int hits = 0;
 };
-} // namespace pedrochord
+} // namespace sdchord

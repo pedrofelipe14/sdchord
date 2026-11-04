@@ -7,10 +7,10 @@
 #include "PluginProcessor.h"
 
 /** Knobs with a value arc in the colour of their section. */
-class PedrochordLook : public juce::LookAndFeel_V4
+class SDChordLook : public juce::LookAndFeel_V4
 {
 public:
-    PedrochordLook();
+    SDChordLook();
     void drawRotarySlider(juce::Graphics&, int x, int y, int w, int h, float pos, float start, float end, juce::Slider&) override;
     /** Toggle buttons are drawn as hardware keys with an LED. */
     void drawToggleButton(juce::Graphics&, juce::ToggleButton&, bool highlighted, bool down) override;
@@ -20,7 +20,7 @@ public:
 class ChordGrid : public juce::Component
 {
 public:
-    explicit ChordGrid(PedrochordProcessor& p) : processor(p) {}
+    explicit ChordGrid(SDChordProcessor& p) : processor(p) {}
 
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
@@ -37,7 +37,7 @@ private:
     void press(int source, int code);
     void release(int source);
 
-    PedrochordProcessor& processor;
+    SDChordProcessor& processor;
     std::map<int, int> pressed; // mouse/touch source -> chord code
     int held = -1, memory = 0;
 };
@@ -46,7 +46,7 @@ private:
 class StrumPlate : public juce::Component
 {
 public:
-    explicit StrumPlate(PedrochordProcessor& p) : processor(p) {}
+    explicit StrumPlate(SDChordProcessor& p) : processor(p) {}
 
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
@@ -61,22 +61,22 @@ private:
     float positionAt(float y) const; // 0 = bottom string, 1 = top
     void pluck(int string, float velocity);
 
-    PedrochordProcessor& processor;
+    SDChordProcessor& processor;
     struct Finger
     {
         float position;
         double time;
     };
     std::map<int, Finger> fingers;
-    std::array<float, pedrochord::kStrings> glow {};
+    std::array<float, sdchord::kStrings> glow {};
     int chordCode = -1;
 };
 
-class PedrochordEditor : public juce::AudioProcessorEditor, private juce::Timer
+class SDChordEditor : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
-    explicit PedrochordEditor(PedrochordProcessor&);
-    ~PedrochordEditor() override;
+    explicit SDChordEditor(SDChordProcessor&);
+    ~SDChordEditor() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -97,7 +97,7 @@ private:
         which left chords stuck; polling the real state means a release can never be lost. */
     void pollKeys();
 
-    std::array<bool, 12 * pedrochord::kChordTypes> keysDown {};
+    std::array<bool, 12 * sdchord::kChordTypes> keysDown {};
     juce::TimedCallback keyPoller { [this] { pollKeys(); } };
     bool focusGrabbed = false;
 
@@ -115,8 +115,8 @@ private:
         int first, count;
     };
 
-    PedrochordProcessor& processor;
-    PedrochordLook look;
+    SDChordProcessor& processor;
+    SDChordLook look;
     ChordGrid grid;
     StrumPlate plate;
     std::array<Knob, 10> knobs;
@@ -131,5 +131,5 @@ private:
     std::vector<Section> sections;
     int shownHeld = -2, shownMemory = -2;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PedrochordEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SDChordEditor)
 };

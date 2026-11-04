@@ -15,16 +15,16 @@ juce::NormalisableRange<float> range(float lo, float hi, float centre = -1.0f)
 }
 } // namespace
 
-PedrochordProcessor::PedrochordProcessor()
+SDChordProcessor::SDChordProcessor()
     : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      state(*this, nullptr, "Pedrochord", createLayout())
+      state(*this, nullptr, "SDChord", createLayout())
 {
 }
 
-juce::AudioProcessorValueTreeState::ParameterLayout PedrochordProcessor::createLayout()
+juce::AudioProcessorValueTreeState::ParameterLayout SDChordProcessor::createLayout()
 {
     using P = juce::AudioParameterFloat;
-    const pedrochord::Params d;
+    const sdchord::Params d;
     auto pct = [](const juce::String& id, const juce::String& name, float def)
     {
         return std::make_unique<P>(juce::ParameterID { id, 1 }, name, range(0.0f, 1.0f), def,
@@ -55,21 +55,21 @@ juce::AudioProcessorValueTreeState::ParameterLayout PedrochordProcessor::createL
     layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID { "seqPattern", 1 }, juce::String::fromUTF8("Patr\xc3\xb3n"),
                                                             seqPatternNames(), d.seqPattern));
     layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID { "seqRate", 1 }, "Figura", seqRateNames(), d.seqRate));
-    layout.add(std::make_unique<juce::AudioParameterInt>(juce::ParameterID { "seqRange", 1 }, "Cuerdas en uso", 2, pedrochord::kStrings, d.seqRange));
+    layout.add(std::make_unique<juce::AudioParameterInt>(juce::ParameterID { "seqRange", 1 }, "Cuerdas en uso", 2, sdchord::kStrings, d.seqRange));
     return layout;
 }
 
-void PedrochordProcessor::prepareToPlay(double sampleRate, int)
+void SDChordProcessor::prepareToPlay(double sampleRate, int)
 {
     dsp.prepare(sampleRate);
 }
 
-bool PedrochordProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+bool SDChordProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
     return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
 }
 
-void PedrochordProcessor::readParams()
+void SDChordProcessor::readParams()
 {
     auto get = [this](const char* id) { return state.getRawParameterValue(id)->load(); };
     auto& p = dsp.params;
@@ -97,7 +97,7 @@ void PedrochordProcessor::readParams()
     currentBpm.store(p.seqBpm, std::memory_order_relaxed);
 }
 
-void PedrochordProcessor::handle(const juce::MidiMessage& m)
+void SDChordProcessor::handle(const juce::MidiMessage& m)
 {
     if (m.isNoteOn())
         dsp.noteOn(m.getNoteNumber(), m.getFloatVelocity());
@@ -109,7 +109,7 @@ void PedrochordProcessor::handle(const juce::MidiMessage& m)
         dsp.allNotesOff();
 }
 
-void PedrochordProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
+void SDChordProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
     juce::ScopedNoDenormals noDenormals;
     const int numSamples = buffer.getNumSamples();
@@ -136,7 +136,7 @@ void PedrochordProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         dsp.process(left + done, right + done, numSamples - done);
 }
 
-void PedrochordProcessor::playFromUi(const juce::MidiMessage& message)
+void SDChordProcessor::playFromUi(const juce::MidiMessage& message)
 {
     if (message.getRawDataSize() != 3)
         return;
@@ -145,19 +145,19 @@ void PedrochordProcessor::playFromUi(const juce::MidiMessage& message)
     uiFifo.write(1).forEach([&](int i) { uiEvents[(size_t) i] = event; }); // dropped only if 1024 are already waiting
 }
 
-juce::AudioProcessorEditor* PedrochordProcessor::createEditor() { return new PedrochordEditor(*this); }
+juce::AudioProcessorEditor* SDChordProcessor::createEditor() { return new SDChordEditor(*this); }
 
-void PedrochordProcessor::getStateInformation(juce::MemoryBlock& destData)
+void SDChordProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     if (auto xml = state.copyState().createXml())
         copyXmlToBinary(*xml, destData);
 }
 
-void PedrochordProcessor::setStateInformation(const void* data, int sizeInBytes)
+void SDChordProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
         if (xml->hasTagName(state.state.getType()))
             state.replaceState(juce::ValueTree::fromXml(*xml));
 }
 
-juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new PedrochordProcessor(); }
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new SDChordProcessor(); }

@@ -14,7 +14,7 @@
 #include "rhythm.h"
 #include "voices.h"
 
-namespace pedrochord
+namespace sdchord
 {
 /** How the auto-strum walks the strings on each step. */
 enum class SeqPattern
@@ -490,4 +490,4 @@ private:
     std::atomic<int> uiHeld { -1 }, uiMemory { 0 }, uiRhythmStep { -1 };
     std::array<std::atomic<float>, kStrings> uiGlow;
 };
-} // namespace pedrochord
+} // namespace sdchord
