@@ -7,11 +7,11 @@ namespace
 {
 namespace Colours
 {
-const juce::Colour bodyTop { 0xffeee4cf }, bodyBottom { 0xffd9c9aa }, bodyEdge { 0xffa8946f };
-const juce::Colour print { 0xff4a3a2b }, printSoft { 0xff7d6a54 }; // silkscreen ink
-const juce::Colour stripes[] = { juce::Colour { 0xff6b4630 }, juce::Colour { 0xffc5662f }, juce::Colour { 0xffd9a441 } };
+const juce::Colour bodyTop { 0xfff6ad62 }, bodyBottom { 0xffe58d3f }, bodyEdge { 0xffa85a24 }; // soft orange plastic
+const juce::Colour print { 0xff3a2012 }, printSoft { 0xff6b3a1c }; // silkscreen ink
+const juce::Colour stripes[] = { juce::Colour { 0xff4e2a16 }, juce::Colour { 0xfff6e7c8 }, juce::Colour { 0xfff3c24f } };
 const juce::Colour keyTop { 0xfff6f1e6 }, keyBottom { 0xffd8cfbf }, keySide { 0xff9c8f7b };
-const juce::Colour recess { 0xffcbb995 }; // panels set into the body
+const juce::Colour recess { 0xffd9823a }; // panels set into the body
 const juce::Colour ledOn { 0xffff3b22 }, ledOff { 0xff5a1810 }, ledWindow { 0xff1d0c09 };
 const juce::Colour plateTop { 0xff34302b }, plateBottom { 0xff1f1c19 }, ridge { 0xff4a443d };
 const juce::Colour ringing { 0xffd9d3c7 }; // the ridge of a string that is sounding

@@ -42,7 +42,7 @@ dsp/      el instrumento: C++17 header-only, sin JUCE (también va a compilar a 
   include/pedrochord/effects.h   chorus y una reverb chica estilo Freeverb
   include/pedrochord/engine.h    pila de acordes apretados, lógica de rasgueo y mezcla
   tests/                       16 tests nativos
-plugin/   la capa JUCE y el editor, dibujado como hardware de los 80 (cuerpo crema, display de LEDs, placa ranurada)
+plugin/   la capa JUCE y el editor, dibujado como hardware de los 80 (cuerpo naranja, display de LEDs, placa ranurada)
 tools/    un renderizador fuera de pantalla que saca la captura de arriba
 ```
 
