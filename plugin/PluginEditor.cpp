@@ -391,10 +391,23 @@ SDChordEditor::SDChordEditor(SDChordProcessor& p) : AudioProcessorEditor(&p), pr
     seqOnAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor.state, "seqOn", seqOnButton);
     seqSyncAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor.state, "seqSync", seqSyncButton);
 
+    const std::pair<const char*, const char*> lfoParams[] = {
+        { "lfoTarget", "DESTINO" }, { "lfoShape", "FORMA" }, { "lfoRate", "VELOCIDAD" }, { "lfoDepth", "CANTIDAD" },
+    };
+    for (size_t i = 0; i < lfoKnobs.size(); ++i)
+    {
+        auto& k = lfoKnobs[i];
+        k.label = lfoParams[i].second;
+        k.slider.setPopupDisplayEnabled(true, true, this);
+        k.slider.setMouseDragSensitivity(i < 2 ? 100 : 180);
+        addAndMakeVisible(k.slider);
+        k.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(processor.state, lfoParams[i].first, k.slider);
+    }
+
     addAndMakeVisible(grid);
     addAndMakeVisible(plate);
     setWantsKeyboardFocus(true);
-    setSize(1060, 760);
+    setSize(1060, 900);
     startTimerHz(40);
     keyPoller.startTimer(4);
 }
@@ -505,6 +518,29 @@ void SDChordEditor::refreshFromEngine()
         shownSeq = text;
         repaint(seqReadout.toNearestInt().expanded(6));
     }
+
+    if (const auto text = lfoReadoutText(); text != shownLfo)
+    {
+        shownLfo = text;
+        repaint(lfoReadout.toNearestInt().expanded(6));
+    }
+    const bool lfoOn = processor.state.getRawParameterValue("lfoDepth")->load() > 0.0f;
+    const float level = lfoOn ? 0.5f + 0.5f * engine.lfoLevel() : 0.0f;
+    if (std::abs(level - shownLfoLevel) > 0.02f)
+    {
+        shownLfoLevel = level;
+        repaint(juce::Rectangle<float>(40, 40).withCentre(lfoLamp).toNearestInt());
+    }
+}
+
+juce::String SDChordEditor::lfoReadoutText() const
+{
+    auto value = [this](const char* id) { return processor.state.getRawParameterValue(id)->load(); };
+    const float rate = value("lfoRate");
+    // Spelled out in capitals: toUpperCase() leaves accented letters alone ("TRéMOLO").
+    static const juce::StringArray targets { "VIBRATO", juce::String::fromUTF8("TR\xc3\x89MOLO"), "FILTRO", "PANEO" };
+    return targets[juce::roundToInt(value("lfoTarget"))] + "\n" + lfoShapeNames()[juce::roundToInt(value("lfoShape"))]
+           + juce::String::fromUTF8(" \xc2\xb7 ") + juce::String(rate, rate < 1.0f ? 2 : 1) + " Hz" + (value("lfoDepth") > 0.0f ? "" : " \x01");
 }
 
 juce::String SDChordEditor::seqReadoutText() const
@@ -603,41 +639,50 @@ void SDChordEditor::paint(juce::Graphics& g)
         }
     }
 
-    // Auto-strum panel.
+    // The two lower panels (auto-strum and LFO): a recess with a bracketed title, a two-line LED
+    // readout (dim when its text ends in \x01, i.e. while that section is off) and labelled knobs.
+    auto lowerPanel = [&](const juce::String& title, float titleWidth, juce::Rectangle<float> readout, const juce::String& text,
+                          const std::array<Knob, 4>& panelKnobs)
     {
-        const auto panel = juce::Rectangle<float>(left, seqReadout.getY() - 40, stripeRight - left, 118);
+        const auto panel = juce::Rectangle<float>(left, readout.getY() - 40, stripeRight - left, 118);
         drawRecess(g, panel, 12.0f);
         const float y = panel.getY() + 16, x0 = panel.getX() + 20, x1 = panel.getRight() - 20;
-        const juce::String title = juce::String::fromUTF8("RASGUEO AUTOM\xc3\x81TICO");
-        const float textWidth = 150.0f, mid = (x0 + x1) * 0.5f;
+        const float mid = (x0 + x1) * 0.5f;
         g.setColour(Colours::print);
         g.setFont(font(10.5f, "Bold"));
-        g.drawText(title, juce::Rectangle<float>(mid - textWidth / 2, y - 7, textWidth, 14), juce::Justification::centred);
-        g.drawLine(x0, y, mid - textWidth / 2, y, 1.0f);
-        g.drawLine(mid + textWidth / 2, y, x1, y, 1.0f);
+        g.drawText(title, juce::Rectangle<float>(mid - titleWidth / 2, y - 7, titleWidth, 14), juce::Justification::centred);
+        g.drawLine(x0, y, mid - titleWidth / 2, y, 1.0f);
+        g.drawLine(mid + titleWidth / 2, y, x1, y, 1.0f);
         g.drawLine(x0, y, x0, y + 5, 1.0f);
         g.drawLine(x1, y, x1, y + 5, 1.0f);
 
-        // Two-line LED readout: pattern, then step length and tempo. Dim while the auto-strum is off.
-        const bool on = !shownSeq.endsWithChar(1);
-        const auto lines = juce::StringArray::fromLines(shownSeq.upToFirstOccurrenceOf("\x01", false, false).trimEnd());
+        const bool on = !text.endsWithChar(1);
+        const auto lines = juce::StringArray::fromLines(text.upToFirstOccurrenceOf("\x01", false, false).trimEnd());
         g.setColour(Colours::bodyEdge);
-        g.fillRoundedRectangle(seqReadout.expanded(4.0f), 8.0f);
+        g.fillRoundedRectangle(readout.expanded(4.0f), 8.0f);
         g.setColour(Colours::ledWindow);
-        g.fillRoundedRectangle(seqReadout, 5.0f);
+        g.fillRoundedRectangle(readout, 5.0f);
         g.setColour(Colours::ledOn.withAlpha(on ? 1.0f : 0.4f));
         g.setFont(font(17.0f, "Bold"));
-        g.drawText(lines[0], seqReadout.withHeight(seqReadout.getHeight() * 0.55f).translated(0, 3), juce::Justification::centred);
+        g.drawText(lines[0], readout.withHeight(readout.getHeight() * 0.55f).translated(0, 3), juce::Justification::centred);
         g.setFont(font(13.0f, "Bold"));
-        g.drawText(lines[1], seqReadout.withTrimmedTop(seqReadout.getHeight() * 0.5f).translated(0, -2), juce::Justification::centred);
+        g.drawText(lines[1], readout.withTrimmedTop(readout.getHeight() * 0.5f).translated(0, -2), juce::Justification::centred);
 
-        for (const auto& k : seqKnobs)
+        for (const auto& k : panelKnobs)
         {
             g.setColour(Colours::print);
             g.setFont(font(10.0f, "Bold"));
             g.drawText(k.label, k.slider.getBounds().withY(k.slider.getBottom() + 1).withHeight(16), juce::Justification::centred);
         }
-    }
+    };
+    // Auto-strum: pattern, then step length and tempo.
+    lowerPanel(juce::String::fromUTF8("RASGUEO AUTOM\xc3\x81TICO"), 150.0f, seqReadout, shownSeq, seqKnobs);
+    // LFO: destination, then wave and speed; the lamp follows the LFO itself.
+    lowerPanel("LFO", 44.0f, lfoReadout, shownLfo, lfoKnobs);
+    drawLed(g, lfoLamp, 6.0f, shownLfoLevel);
+    g.setColour(Colours::print);
+    g.setFont(font(10.0f, "Bold"));
+    g.drawText("PULSO", juce::Rectangle<float>(80, 16).withCentre(lfoLamp.translated(0, 22)), juce::Justification::centred);
 
     // How to play it from a DAW, printed small along the bottom edge.
     g.setColour(Colours::printSoft);
@@ -662,6 +707,13 @@ void SDChordEditor::resized()
     seqReadout = juce::Rectangle<float>((float) left + 180, (float) seqY + 2, 176, 52);
     for (size_t i = 0; i < seqKnobs.size(); ++i)
         seqKnobs[i].slider.setBounds(left + 390 + (int) i * 68, seqY - 2, 56, 56);
+
+    // LFO row, laid out like the auto-strum's: the lamp where the keys are, then readout and knobs.
+    const int lfoY = seqY + 132;
+    lfoLamp = { (float) left + 89, (float) lfoY + 22 };
+    lfoReadout = juce::Rectangle<float>((float) left + 180, (float) lfoY + 2, 176, 52);
+    for (size_t i = 0; i < lfoKnobs.size(); ++i)
+        lfoKnobs[i].slider.setBounds(left + 390 + (int) i * 68, lfoY - 2, 56, 56);
 
     const int knob = 58, gap = 4, sectionGap = 18, y = 462;
     int total = 0;

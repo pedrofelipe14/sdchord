@@ -7,6 +7,9 @@
 /** Display names of the auto-strum's patterns and step lengths, in engine order. */
 juce::StringArray seqPatternNames();
 juce::StringArray seqRateNames();
+/** Display names of the LFO's waves and destinations, in engine order. */
+juce::StringArray lfoShapeNames();
+juce::StringArray lfoTargetNames();
 
 class SDChordProcessor : public juce::AudioProcessor
 {

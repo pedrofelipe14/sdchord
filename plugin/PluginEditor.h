@@ -128,6 +128,14 @@ private:
     juce::Rectangle<float> seqReadout;
     juce::String shownSeq;
     juce::String seqReadoutText() const;
+
+    // LFO panel: a lamp that follows the LFO, a readout and four knobs.
+    std::array<Knob, 4> lfoKnobs;
+    juce::Rectangle<float> lfoReadout;
+    juce::Point<float> lfoLamp;
+    juce::String shownLfo;
+    float shownLfoLevel = 0.0f;
+    juce::String lfoReadoutText() const;
     std::vector<Section> sections;
     int shownHeld = -2, shownMemory = -2;
 

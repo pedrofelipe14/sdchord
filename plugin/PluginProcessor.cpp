@@ -3,6 +3,8 @@
 
 juce::StringArray seqPatternNames() { return { "Arriba", "Abajo", "Ida y vuelta", "Rasgueo", "Al azar" }; }
 juce::StringArray seqRateNames() { return { "1/4", "1/8", "1/8 T", "1/16" }; }
+juce::StringArray lfoShapeNames() { return { "Seno", juce::String::fromUTF8("Tri\xc3\xa1ngulo"), "Cuadrada", "Al azar" }; }
+juce::StringArray lfoTargetNames() { return { "Vibrato", juce::String::fromUTF8("Tr\xc3\xa9molo"), "Filtro", "Paneo" }; }
 
 namespace
 {
@@ -56,6 +58,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout SDChordProcessor::createLayo
                                                             seqPatternNames(), d.seqPattern));
     layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID { "seqRate", 1 }, "Figura", seqRateNames(), d.seqRate));
     layout.add(std::make_unique<juce::AudioParameterInt>(juce::ParameterID { "seqRange", 1 }, "Cuerdas en uso", 2, sdchord::kStrings, d.seqRange));
+
+    // LFO: off until it gets some depth.
+    layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID { "lfoTarget", 1 }, "LFO destino", lfoTargetNames(), d.lfoTarget));
+    layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID { "lfoShape", 1 }, "LFO forma", lfoShapeNames(), d.lfoShape));
+    layout.add(std::make_unique<P>(juce::ParameterID { "lfoRate", 1 }, "LFO velocidad", range(0.1f, 12.0f, 2.0f), d.lfoRate,
+                                   juce::AudioParameterFloatAttributes().withStringFromValueFunction(
+                                       [](float v, int) { return juce::String(v, v < 1.0f ? 2 : 1) + " Hz"; })));
+    layout.add(pct("lfoDepth", "LFO cantidad", d.lfoDepth));
     return layout;
 }
 
@@ -89,6 +99,10 @@ void SDChordProcessor::readParams()
     p.seqRate = juce::roundToInt(get("seqRate"));
     p.seqRange = juce::roundToInt(get("seqRange"));
     p.seqBpm = get("seqBpm");
+    p.lfoTarget = juce::roundToInt(get("lfoTarget"));
+    p.lfoShape = juce::roundToInt(get("lfoShape"));
+    p.lfoRate = get("lfoRate");
+    p.lfoDepth = get("lfoDepth");
     if (get("seqSync") > 0.5f)
         if (auto* host = getPlayHead())
             if (const auto position = host->getPosition())

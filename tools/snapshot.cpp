@@ -17,6 +17,9 @@ int main(int argc, char* argv[])
     // Show the auto-strum switched on, playing up and down in eighths.
     processor.state.getParameter("seqOn")->setValueNotifyingHost(1.0f);
     processor.state.getParameter("seqPattern")->setValueNotifyingHost(processor.state.getParameter("seqPattern")->convertTo0to1(2.0f));
+    // And a gentle tremolo on the LFO.
+    processor.state.getParameter("lfoTarget")->setValueNotifyingHost(processor.state.getParameter("lfoTarget")->convertTo0to1(1.0f));
+    processor.state.getParameter("lfoDepth")->setValueNotifyingHost(0.4f);
 
     juce::AudioBuffer<float> buffer(2, 512);
     auto play = [&](juce::MidiBuffer midi, int blocks)
