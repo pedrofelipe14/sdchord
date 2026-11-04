@@ -11,6 +11,7 @@
 
 #include "chords.h"
 #include "effects.h"
+#include "rhythm.h"
 #include "voices.h"
 
 namespace pedrochord
@@ -49,6 +50,12 @@ struct Params
     int seqPattern = 0; // SeqPattern
     int seqRate = 1; // index into kStepsPerBeat
     int seqRange = 8; // how many strings it uses, from the lowest (2..13)
+
+    // Rhythm machine (the web version shows it). While it runs, it is the clock: the auto-strum
+    // locks to its grid so both stay in time. It shares the auto-strum's tempo (seqBpm).
+    bool rhythmOn = false;
+    int rhythmPattern = 0; // index into rhythmPatterns()
+    float rhythmLevel = 0.7f; // 0..1
 };
 
 class Engine
@@ -66,6 +73,7 @@ public:
             s.prepare(sr);
         chorus.prepare(sr);
         reverb.prepare(sr);
+        rhythm.prepare(sr);
         smooth = coefFor(0.02, sr);
     }
 
@@ -162,6 +170,9 @@ public:
     int pluckCount() const { return plucks; }
     /** The string plucked most recently (by hand or by the auto-strum), or -1. */
     int lastPluckedString() const { return lastString; }
+    /** The rhythm machine's current step in its bar, or -1 while it is stopped. */
+    int rhythmStep() const { return uiRhythmStep.load(std::memory_order_relaxed); }
+    int drumHits() const { return rhythm.hitCount(); }
 
     static int codeOf(const Chord& c) { return c.root + 12 * static_cast<int>(c.type); }
 
@@ -172,14 +183,18 @@ public:
         const float chordTarget = params.chordLevel * 0.17f;
         const float bassTarget = params.bassLevel * 0.45f;
         const float stringTarget = params.stringLevel * 0.24f;
+        const float drumTarget = params.rhythmLevel * 0.5f;
 
         for (int i = 0; i < numSamples; ++i)
         {
             chordGain += (chordTarget - chordGain) * smooth;
             bassGain += (bassTarget - bassGain) * smooth;
             stringGain += (stringTarget - stringGain) * smooth;
+            drumGain += (drumTarget - drumGain) * smooth;
 
+            rhythmTick();
             sequencerTick();
+            advanceClock();
             const float pitchMul = wobbleStep();
 
             float pad = 0.0f;
@@ -202,8 +217,9 @@ public:
             float l = pad * chordGain + sl * stringGain;
             float r = pad * chordGain + sr * stringGain;
             chorus.process(l, r, params.chorus);
-            l += low; // the bass stays dry and centred
-            r += low;
+            const float drums = rhythm.process() * drumGain;
+            l += low + drums; // bass and drums stay dry and centred (only the reverb touches them)
+            r += low + drums;
             reverb.process(l, r, params.reverb);
 
             left[i] = std::tanh(l * params.master * 1.2f);
@@ -290,6 +306,29 @@ private:
             seqRunning = false;
             return;
         }
+        const int rate = std::clamp(params.seqRate, 0, kSeqRates - 1);
+        const int perBeat = kStepsPerBeat[rate];
+
+        if (rhythmRunning)
+        {
+            // Locked to the drums: steps land on the clock's grid. A chord pressed between grid
+            // points waits for the next one, so the strings never drift from the beat.
+            const double gridPos = clock * perBeat;
+            if (!seqRunning)
+            {
+                seqRunning = true;
+                seqStep = 0;
+                nextGrid = (long long) std::ceil(gridPos - 1e-9);
+            }
+            if (gridPos >= (double) nextGrid)
+            {
+                fireStep(nextGrid % perBeat == 0);
+                ++seqStep;
+                nextGrid = (long long) std::floor(gridPos) + 1;
+            }
+            return;
+        }
+
         if (!seqRunning) // a chord was just pressed: start on the beat, right now
         {
             seqRunning = true;
@@ -298,19 +337,66 @@ private:
         }
         if (seqCountdown <= 0.0)
         {
-            fireStep();
+            fireStep(seqStep % perBeat == 0);
             ++seqStep;
-            const int rate = std::clamp(params.seqRate, 0, kSeqRates - 1);
-            seqCountdown += 60.0 / std::clamp((double) params.seqBpm, 20.0, 400.0) * sampleRate / kStepsPerBeat[rate];
+            seqCountdown += samplesPerBeat() / perBeat;
         }
         seqCountdown -= 1.0;
     }
 
-    void fireStep()
+    double samplesPerBeat() const { return 60.0 / std::clamp((double) params.seqBpm, 20.0, 400.0) * sampleRate; }
+
+    // ---- rhythm machine and its clock -------------------------------------------------------
+
+    /** Plays the drums for the current step when the clock reaches it. */
+    void rhythmTick()
+    {
+        if (!params.rhythmOn)
+        {
+            if (rhythmRunning)
+            {
+                rhythmRunning = false;
+                seqRunning = false; // the auto-strum goes back to its own timing
+                uiRhythmStep.store(-1, std::memory_order_relaxed);
+            }
+            return;
+        }
+
+        const int index = std::clamp(params.rhythmPattern, 0, kRhythmPatterns - 1);
+        const auto& pattern = rhythmPatterns()[(size_t) index];
+        if (!rhythmRunning) // start: bar 1, beat 1, right now
+        {
+            rhythmRunning = true;
+            seqRunning = false; // re-lock the auto-strum to the new clock
+            clock = 0.0;
+            nextDrumStep = 0;
+            currentPattern = index;
+        }
+        else if (index != currentPattern)
+        {
+            // A new rhythm takes over from the next step of its own grid (triplets or sixteenths).
+            currentPattern = index;
+            nextDrumStep = (long long) std::ceil(clock * pattern.stepsPerBeat - 1e-9);
+        }
+
+        if (clock * pattern.stepsPerBeat >= (double) nextDrumStep)
+        {
+            const int step = (int) (nextDrumStep % pattern.length);
+            rhythm.playStep(pattern, step);
+            uiRhythmStep.store(step, std::memory_order_relaxed);
+            ++nextDrumStep;
+        }
+    }
+
+    void advanceClock()
+    {
+        if (rhythmRunning)
+            clock += 1.0 / samplesPerBeat();
+    }
+
+    void fireStep(bool onBeat)
     {
         const int range = std::clamp(params.seqRange, 2, kStrings);
-        const int rate = std::clamp(params.seqRate, 0, kSeqRates - 1);
-        const bool onBeat = seqStep % kStepsPerBeat[rate] == 0;
         const float velocity = onBeat ? 0.95f : 0.7f; // accent the first step of each beat
 
         switch (static_cast<SeqPattern>(std::clamp(params.seqPattern, 0, kSeqPatterns - 1)))
@@ -387,13 +473,21 @@ private:
     bool seqRunning = false;
     int seqStep = 0;
     double seqCountdown = 0.0;
+    long long nextGrid = 0;
+
+    RhythmBox rhythm;
+    bool rhythmRunning = false;
+    double clock = 0.0; // beats since the rhythm machine started
+    long long nextDrumStep = 0;
+    int currentPattern = 0;
+    float drumGain = 0.0f;
 
     float smooth = 0.001f, chordGain = 0.0f, bassGain = 0.0f, stringGain = 0.0f;
     double wowPhase = 0.0;
     float drift = 0.0f, driftTarget = 0.0f;
     int driftCountdown = 0;
 
-    std::atomic<int> uiHeld { -1 }, uiMemory { 0 };
+    std::atomic<int> uiHeld { -1 }, uiMemory { 0 }, uiRhythmStep { -1 };
     std::array<std::atomic<float>, kStrings> uiGlow;
 };
 } // namespace pedrochord

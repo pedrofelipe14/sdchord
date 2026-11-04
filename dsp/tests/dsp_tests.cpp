@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <functional>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "pedrochord/engine.h"
@@ -408,6 +409,118 @@ TEST(auto_strum_stops_when_the_chord_is_released_and_restarts_on_the_beat)
     render(*e, 0.01);
     CHECK(e->pluckCount() == 4);
     CHECK(e->lastPluckedString() == 0);
+}
+
+// ---- rhythm machine ---------------------------------------------------------------------------
+
+TEST(rhythm_patterns_are_well_formed)
+{
+    for (const auto& p : rhythmPatterns())
+    {
+        CHECK(p.stepsPerBeat == 3 || p.stepsPerBeat == 4);
+        CHECK(p.length % p.stepsPerBeat == 0);
+        bool anyKick = false;
+        for (int d = 0; d < kDrums; ++d)
+        {
+            const std::string row = p.hits[d];
+            CHECK((int) row.size() == p.length);
+            CHECK(row.find_first_not_of("xX.") == std::string::npos);
+            anyKick = anyKick || (d == Kick && row.find_first_of("xX") != std::string::npos);
+        }
+        CHECK(anyKick);
+    }
+}
+
+TEST(rhythm_machine_is_off_by_default)
+{
+    auto e = makeEngine();
+    CHECK(render(*e, 0.5) == 0.0f);
+    CHECK(e->drumHits() == 0);
+    CHECK(e->rhythmStep() == -1);
+}
+
+TEST(rhythm_machine_plays_in_time_on_its_own)
+{
+    auto steps = [](int pattern)
+    {
+        auto e = makeEngine();
+        e->params.rhythmOn = true;
+        e->params.rhythmPattern = pattern;
+        e->params.seqBpm = 120.0f;
+        std::vector<float> l(1), r(1);
+        int last = -1, count = 0;
+        for (int i = 0; i < (int) (0.99 * sampleRate); ++i)
+        {
+            e->process(l.data(), r.data(), 1);
+            if (e->rhythmStep() != last)
+            {
+                last = e->rhythmStep();
+                ++count;
+            }
+        }
+        return count;
+    };
+    CHECK(steps(0) == 8); // Rock: sixteenths at 120 BPM, 8 in a second
+    CHECK(steps(7) == 6); // Swing: triplets, 6 in a second
+
+    auto e = makeEngine();
+    e->params.rhythmOn = true;
+    CHECK(render(*e, 0.5) > 0.01f); // drums sound with no chord held
+    CHECK(e->drumHits() > 0);
+}
+
+TEST(stopping_the_rhythm_machine_lets_the_drums_ring_out)
+{
+    auto e = makeEngine();
+    e->params.reverb = 0.0f;
+    e->params.rhythmOn = true;
+    render(*e, 1.0);
+    e->params.rhythmOn = false;
+    render(*e, 0.01);
+    CHECK(e->rhythmStep() == -1);
+    const int hits = e->drumHits();
+    render(*e, 1.5);
+    CHECK(e->drumHits() == hits);
+    CHECK(render(*e, 0.1) < 1.0e-4f);
+}
+
+TEST(auto_strum_locks_to_the_drums)
+{
+    auto e = makeEngine();
+    e->params.rhythmOn = true;
+    e->params.seqBpm = 120.0f; // a beat every 0.5 s
+    e->params.seqOn = true;
+    e->params.seqRate = 1; // eighths: grid every 0.25 s
+    render(*e, 0.1); // the drums are 0.2 beats in
+    e->noteOn(noteForChord(cMajor), 1.0f);
+    render(*e, 0.14); // up to 0.24 s: still before the next eighth
+    CHECK(e->pluckCount() == 0);
+    render(*e, 0.02); // 0.26 s: the strum lands on the grid
+    CHECK(e->pluckCount() == 1);
+    render(*e, 0.5);
+    CHECK(e->pluckCount() == 3); // 0.5 s and 0.75 s
+}
+
+TEST(drums_and_everything_else_stay_below_full_scale)
+{
+    auto e = makeEngine();
+    e->params = { 1, 1, 1, 1, 8, 1, 1, 1, 1, 1 };
+    e->params.rhythmOn = true;
+    e->params.rhythmLevel = 1.0f;
+    e->params.seqOn = true;
+    e->params.seqPattern = (int) SeqPattern::Strum;
+    e->noteOn(noteForChord({ 2, ChordType::MinorSeventh }), 1.0f);
+    for (int pattern = 0; pattern < kRhythmPatterns; ++pattern)
+    {
+        e->params.rhythmPattern = pattern;
+        std::vector<float> l(24000), r(24000);
+        e->process(l.data(), r.data(), 24000);
+        for (size_t i = 0; i < l.size(); ++i)
+        {
+            CHECK(std::isfinite(l[i]) && std::isfinite(r[i]));
+            CHECK(std::fabs(l[i]) < 1.0f && std::fabs(r[i]) < 1.0f);
+        }
+    }
 }
 
 int main()
