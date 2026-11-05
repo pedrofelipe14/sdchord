@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { FIRST_CHORD_NOTE, FIRST_STRING_NOTE } from './chords'
+import { LoopState } from './engine'
 import { ParamId, RHYTHMS } from './params'
 
 // Runs the real compiled engine (public/sdchord.wasm, built by scripts/build-wasm.sh) the same way
@@ -26,6 +27,11 @@ interface Engine {
   sdc_rhythm_count(): number
   sdc_rhythm_length(pattern: number): number
   sdc_rhythm_steps_per_beat(pattern: number): number
+  sdc_loop_button(): void
+  sdc_loop_clear(): void
+  sdc_loop_state(): number
+  sdc_loop_beats(): number
+  sdc_loop_position(): number
 }
 
 function load(): Engine {
@@ -117,6 +123,29 @@ describe.skipIf(!existsSync(wasmUrl))('compiled engine (sdchord.wasm)', () => {
     engine.sdc_set_param(ParamId.rhythmOn, 0)
     renderRms(engine, 1)
     expect(engine.sdc_rhythm_step()).toBe(-1)
+  })
+
+  it('records a loop of chords and plays it back', () => {
+    const engine = load()
+    engine.sdc_set_param(ParamId.seqBpm, 120)
+    engine.sdc_loop_button()
+    expect(engine.sdc_loop_state()).toBe(LoopState.Armed)
+    engine.sdc_note_on(FIRST_CHORD_NOTE, 1) // C starts the recording
+    renderRms(engine, 375) // 1 s = 2 beats
+    engine.sdc_note_on(FIRST_CHORD_NOTE + A_MINOR, 1)
+    engine.sdc_note_off(FIRST_CHORD_NOTE)
+    renderRms(engine, 375)
+    engine.sdc_note_off(FIRST_CHORD_NOTE + A_MINOR)
+    engine.sdc_loop_button()
+    expect(engine.sdc_loop_state()).toBe(LoopState.Playing)
+    expect(engine.sdc_loop_beats()).toBeCloseTo(4, 1)
+    expect(renderRms(engine, 100)).toBeGreaterThan(0.01) // sounds with nothing held
+    expect(engine.sdc_held_chord()).toBe(0)
+    renderRms(engine, 300)
+    expect(engine.sdc_held_chord()).toBe(A_MINOR)
+    engine.sdc_loop_clear()
+    expect(engine.sdc_loop_state()).toBe(LoopState.Empty)
+    expect(engine.sdc_held_chord()).toBe(-1)
   })
 
   it('runs the auto-strum in time while a chord is held', () => {

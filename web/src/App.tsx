@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChordGrid } from './components/ChordGrid'
 import { Knob } from './components/Knob'
 import { StrumPlate } from './components/StrumPlate'
 import { chordName } from './engine/chords'
-import { type EngineState, SDChordEngine, silentState } from './engine/engine'
+import { type EngineState, LoopState, SDChordEngine, silentState } from './engine/engine'
 import { chordForKey } from './engine/keyboard'
 import { defaultValues, type Lang, PARAMS, ParamId, RHYTHMS } from './engine/params'
 import { initialLang, saveLang, STRINGS } from './i18n'
@@ -68,6 +68,7 @@ export default function App() {
   const [midiInputs, setMidiInputs] = useState(0)
   const [showRhythm, setShowRhythm] = useState(loadShowRhythm)
   const [latch, setLatch] = useState(loadLatch)
+  const [forget, setForget] = useState(0)
   const t = STRINGS[lang]
 
   useEffect(() => {
@@ -76,6 +77,14 @@ export default function App() {
   }, [lang])
 
   useEffect(() => engine.onState(setState), [engine])
+
+  // When a recording closes, the engine lets go of the held chords so the loop can play: hold mode
+  // must forget the chord it was keeping, or the next tap on it would release it instead.
+  const lastLoopState = useRef(LoopState.Empty)
+  useEffect(() => {
+    if (lastLoopState.current === LoopState.Recording && state.loopState === LoopState.Playing) setForget((n) => n + 1)
+    lastLoopState.current = state.loopState
+  }, [state.loopState])
   useEffect(() => engine.preload(), [engine])
 
   // Every gesture (lifting a finger, a click, a key) tries to switch the audio on: Safari on iPhone
@@ -111,7 +120,10 @@ export default function App() {
   useEffect(() => engine.setParam(ParamId.seqOn, seqOnValue), [engine, seqOnValue])
   useEffect(() => {
     engine.setParam(ParamId.rhythmOn, rhythmOnValue)
-    if (rhythmOnValue) void engine.start().then(() => setRunning(true)) // the drums need audio running
+    if (rhythmOnValue) {
+      void engine.start().then(() => setRunning(true)) // the drums need audio running
+      setShowRhythm(true) // Enter can start them with the panel closed
+    }
   }, [engine, rhythmOnValue])
 
   const setParam = (id: ParamId, value: number) => {
@@ -198,6 +210,28 @@ export default function App() {
   const beats = rhythm.length / rhythm.stepsPerBeat
   const onBeat = state.rhythmStep >= 0 && state.rhythmStep % rhythm.stepsPerBeat === 0
 
+  // The looper: whole bars when it was recorded with the drums, otherwise beats.
+  const loop = state.loopState
+  const hasLoop = loop === LoopState.Playing || loop === LoopState.Stopped
+  const loopLength = state.loopBeats
+  const loopBarsCount = loopLength / beats
+  const loopLengthText =
+    loop === LoopState.Recording
+      ? t.loopBeats(Math.floor(loopLength) + 1)
+      : !hasLoop
+        ? ' '
+        : rhythmOn && Math.abs(loopBarsCount - Math.round(loopBarsCount)) < 1e-3
+          ? t.loopBars(Math.round(loopBarsCount))
+          : t.loopBeats(Math.round(loopLength * 10) / 10)
+  const loopLeds = hasLoop ? Math.min(32, Math.max(1, Math.ceil(loopLength - 1e-3))) : 0
+  const loopLed = loop === LoopState.Playing && loopLength > 0 ? Math.floor((state.loopPos / loopLength) * loopLeds) : -1
+
+  /** Closing the rhythm panel stops the drums too. */
+  const toggleRhythmPanel = () => {
+    if (showRhythm && rhythmOn) setValues((v) => v.map((old, i) => (i === ParamId.rhythmOn ? 0 : old)))
+    setShowRhythm(!showRhythm)
+  }
+
   return (
     <main className="stage">
       <div className="body">
@@ -226,7 +260,7 @@ export default function App() {
             className={`key panel-toggle${showRhythm ? ' down' : ''}`}
             aria-expanded={showRhythm}
             aria-controls="rhythm-panel"
-            onClick={() => setShowRhythm((v) => !v)}
+            onClick={toggleRhythmPanel}
           >
             <span className={`led${rhythmOn ? ' on' : ''}`} />
             <span className="key-label">{t.sections.rhythm} {showRhythm ? '▴' : '▾'}</span>
@@ -253,6 +287,7 @@ export default function App() {
                 held={state.held}
                 memory={state.memory}
                 latch={latch}
+                forget={forget}
                 onPress={(code) => {
                   engine.pressChord(code)
                   started()
@@ -302,6 +337,42 @@ export default function App() {
                   ))}
                 </div>
               </div>
+            </section>
+
+            <section className="recess seq-panel loop-panel">
+              <h2 className="bracket wide">
+                <span>{t.sections.loop}</span>
+              </h2>
+              <div className="seq-row">
+                <button
+                  className={`key toggle${loop === LoopState.Recording || loop === LoopState.Playing ? ' down' : ''}`}
+                  onClick={() => {
+                    engine.loopButton()
+                    started()
+                  }}
+                >
+                  {/* Blinks while waiting for the first chord, lit while recording or playing. */}
+                  <span className={`led${loop === LoopState.Armed ? ' on armed' : loop === LoopState.Recording || loop === LoopState.Playing ? ' on' : ''}`} />
+                  <span className="key-label">{t.loopKeys[loop]}</span>
+                </button>
+                <button className="key toggle" disabled={loop === LoopState.Empty} onClick={() => engine.loopClear()}>
+                  <span className="led" />
+                  <span className="key-label">{t.clearKey}</span>
+                </button>
+                <div className={`led-window seq-readout${loop === LoopState.Empty ? ' off' : ''}`}>
+                  <span className="line1">{t.loopStatus[loop]}</span>
+                  <span className="line2">{loopLengthText}</span>
+                </div>
+              </div>
+              {/* One LED per beat of the loop, lit as it goes round. */}
+              {loopLeds > 0 && (
+                <div className="steps loop-steps" aria-hidden="true">
+                  {Array.from({ length: loopLeds }, (_, i) => (
+                    <span key={i} className={`led${i === loopLed ? ' on' : ''}`} />
+                  ))}
+                </div>
+              )}
+              <p className="panel-note">{t.loopHint}</p>
             </section>
 
             <section className="recess seq-panel lfo-panel">

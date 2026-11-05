@@ -47,6 +47,16 @@ enum class LfoTarget
 };
 constexpr int kLfoTargets = 4;
 
+/** The chord looper, driven by one button: record, then play, then stop and play again. */
+enum class LoopState
+{
+    Empty,
+    Armed, // waiting for the first chord, which starts the recording
+    Recording,
+    Playing,
+    Stopped, // a loop is kept, silent
+};
+
 /** Step lengths: quarter, eighth, eighth triplet, sixteenth. */
 constexpr int kSeqRates = 4;
 constexpr int kStepsPerBeat[kSeqRates] = { 1, 2, 3, 4 };
@@ -130,11 +140,8 @@ public:
     void noteOff(int note)
     {
         Chord chord;
-        if (chordForNote(note, chord))
-        {
-            removeHeld(note);
+        if (chordForNote(note, chord) && removeHeld(note))
             updateChord();
-        }
     }
 
     /** CC1 is a finger on the plate: moving it plucks every string it crosses. CC123 = all notes off. */
@@ -176,6 +183,41 @@ public:
         lastString = string;
     }
 
+    // ---- chord looper -------------------------------------------------------------------------
+    //
+    // Records the chord changes (not the strings), then plays them round and round so you can strum
+    // and play the auto-strum over them. Each chord lasts until the next one. While the rhythm machine
+    // runs, the loop starts on the nearest bar line and lasts whole bars, so it stays with the drums.
+    // A chord held by hand sounds over the loop; letting go brings the loop back.
+
+    /** The looper's one button: arm (the first chord starts recording), close the loop and play it,
+        stop it, play it again from the top. */
+    void loopButton()
+    {
+        switch (loopState)
+        {
+            case LoopState::Empty: setLoopState(LoopState::Armed); break;
+            case LoopState::Armed: setLoopState(LoopState::Empty); break; // nothing was played
+            case LoopState::Recording: closeLoop(); break;
+            case LoopState::Playing:
+                setLoopState(LoopState::Stopped);
+                setLoopCode(-1);
+                break;
+            case LoopState::Stopped:
+                setLoopState(LoopState::Playing);
+                loopSeek(rhythmRunning ? std::fmod(clock, barBeats()) : 0.0); // from its first bar, on the drums' beat
+                break;
+        }
+    }
+
+    void loopClear()
+    {
+        setLoopState(LoopState::Empty);
+        eventCount = 0;
+        loopLength = 0.0;
+        setLoopCode(-1);
+    }
+
     void allNotesOff()
     {
         heldCount = 0;
@@ -193,7 +235,8 @@ public:
     float stringGlow(int s) const { return uiGlow[(size_t) s].load(std::memory_order_relaxed); }
 
     Chord stringChord() const { return memory; }
-    bool chordSounding() const { return heldCount > 0; }
+    /** A chord is held, or the loop is playing one. */
+    bool chordSounding() const { return heldCount > 0 || loopCode >= 0; }
     int pluckCount() const { return plucks; }
     /** The string plucked most recently (by hand or by the auto-strum), or -1. */
     int lastPluckedString() const { return lastString; }
@@ -202,6 +245,11 @@ public:
     int drumHits() const { return rhythm.hitCount(); }
     /** The LFO's current value, -1..1 (0 while its depth is 0). */
     float lfoLevel() const { return uiLfo.load(std::memory_order_relaxed); }
+    int loopStatus() const { return uiLoopState.load(std::memory_order_relaxed); } // LoopState
+    /** The loop's length in beats; while recording, how long it has been recording. */
+    float loopBeats() const { return uiLoopBeats.load(std::memory_order_relaxed); }
+    /** Where the loop is, in beats from its start. */
+    float loopPosition() const { return uiLoopPos.load(std::memory_order_relaxed); }
 
     static int codeOf(const Chord& c) { return c.root + 12 * static_cast<int>(c.type); }
 
@@ -221,6 +269,7 @@ public:
             stringGain += (stringTarget - stringGain) * smooth;
             drumGain += (drumTarget - drumGain) * smooth;
 
+            loopTick();
             rhythmTick();
             sequencerTick();
             advanceClock();
@@ -271,6 +320,7 @@ public:
         for (int s = 0; s < kStrings; ++s)
             uiGlow[(size_t) s].store(strings[(size_t) s].level(), std::memory_order_relaxed);
         uiLfo.store(lfoValue, std::memory_order_relaxed);
+        publishLoop();
     }
 
     Engine()
@@ -287,19 +337,37 @@ public:
     }
 
 private:
-    void removeHeld(int note)
+    /** Returns whether the note was held. */
+    bool removeHeld(int note)
     {
         int w = 0;
         for (int r = 0; r < heldCount; ++r)
             if (held[(size_t) r] != note)
                 held[(size_t) w++] = held[(size_t) r];
+        const bool was = w != heldCount;
         heldCount = w;
+        return was;
     }
 
-    /** The newest held chord sounds; letting it go falls back to the one held before it. */
+    /** The chord held by hand, or -1. */
+    int liveCode() const
+    {
+        Chord chord;
+        return heldCount > 0 && chordForNote(held[(size_t) (heldCount - 1)], chord) ? codeOf(chord) : -1;
+    }
+
+    /** The newest held chord sounds; letting it go falls back to the one held before it, or to the loop. */
     void updateChord()
     {
-        if (heldCount == 0)
+        const int live = liveCode();
+        if (live >= 0)
+            recordChord(live);
+        playChord(live >= 0 ? live : loopCode);
+    }
+
+    void playChord(int code)
+    {
+        if (code < 0)
         {
             for (auto& p : pads)
                 p.stop();
@@ -308,8 +376,7 @@ private:
             return;
         }
 
-        Chord chord;
-        chordForNote(held[(size_t) (heldCount - 1)], chord);
+        const Chord chord { code % 12, static_cast<ChordType>(code / 12) };
         memory = chord;
 
         int count = 0;
@@ -325,6 +392,121 @@ private:
 
         uiHeld.store(codeOf(chord), std::memory_order_relaxed);
         uiMemory.store(codeOf(chord), std::memory_order_relaxed);
+    }
+
+    // ---- chord looper internals ---------------------------------------------------------------
+
+    void setLoopState(LoopState s)
+    {
+        loopState = s;
+        publishLoop();
+    }
+
+    void publishLoop()
+    {
+        uiLoopState.store(static_cast<int>(loopState), std::memory_order_relaxed);
+        uiLoopBeats.store((float) (loopState == LoopState::Recording ? loopTime - loopStart : loopLength), std::memory_order_relaxed);
+        uiLoopPos.store((float) loopPos, std::memory_order_relaxed);
+    }
+
+    /** The current rhythm's bar, in beats (3 for the waltz, 4 for the rest). */
+    double barBeats() const
+    {
+        const auto& pattern = rhythmPatterns()[(size_t) std::clamp(params.rhythmPattern, 0, kRhythmPatterns - 1)];
+        return (double) pattern.length / pattern.stepsPerBeat;
+    }
+
+    /** While recording, notes each change of the held chord with when it happened. */
+    void recordChord(int code)
+    {
+        if (loopState == LoopState::Armed)
+        {
+            setLoopState(LoopState::Recording);
+            eventCount = 0;
+            loopStart = loopTime;
+            loopOnBars = rhythmRunning;
+            if (loopOnBars) // start on the nearest bar line, so a chord pressed a bit early still counts as beat 1
+            {
+                const double bar = barBeats(), phase = std::fmod(clock, bar);
+                loopStart += phase < bar / 2 ? -phase : bar - phase;
+            }
+        }
+        if (loopState != LoopState::Recording || eventCount == (int) events.size())
+            return;
+        if (eventCount > 0 && events[(size_t) (eventCount - 1)].code == code)
+            return;
+        events[(size_t) eventCount++] = { loopTime - loopStart, code };
+    }
+
+    /** Ends the recording: the loop gets its length (whole bars with the drums, whole beats with the
+        auto-strum) and plays on from where it is, without a gap. */
+    void closeLoop()
+    {
+        const double elapsed = loopTime - loopStart;
+        const double unit = loopOnBars ? barBeats() : params.seqOn ? 1.0 : 0.0;
+        loopLength = unit > 0.0 ? std::max(1.0, std::round(elapsed / unit)) * unit : std::max(elapsed, 0.25);
+
+        // Changes after the end are dropped; one pressed just before the first bar line wraps to the end.
+        int kept = 0;
+        for (int i = 0; i < eventCount; ++i)
+        {
+            auto e = events[(size_t) i];
+            if (e.pos >= loopLength)
+                continue;
+            if (e.pos < 0.0)
+                e.pos += loopLength;
+            events[(size_t) kept++] = e;
+        }
+        eventCount = kept;
+        std::sort(events.begin(), events.begin() + eventCount, [](const LoopEvent& a, const LoopEvent& b) { return a.pos < b.pos; });
+        if (eventCount == 0)
+        {
+            loopClear();
+            return;
+        }
+
+        // The loop takes over from the hand: let go of the held chords (hold mode would keep them).
+        heldCount = 0;
+        loopSeek(elapsed - std::floor(elapsed / loopLength) * loopLength);
+        setLoopState(LoopState::Playing);
+    }
+
+    /** Jumps the loop to `pos` beats and sounds the chord that belongs there. */
+    void loopSeek(double pos)
+    {
+        loopPos = pos;
+        nextEvent = 0;
+        while (nextEvent < eventCount && events[(size_t) nextEvent].pos <= pos)
+            ++nextEvent;
+        // Before the first change, the last chord of the loop is still sounding.
+        const int at = nextEvent > 0 ? nextEvent - 1 : eventCount - 1;
+        loopCode = -2; // force the chord to start
+        setLoopCode(events[(size_t) at].code);
+    }
+
+    void setLoopCode(int code)
+    {
+        if (code == loopCode)
+            return;
+        loopCode = code;
+        if (heldCount == 0) // a chord held by hand stays on top
+            playChord(code);
+    }
+
+    void loopTick()
+    {
+        const double step = 1.0 / samplesPerBeat();
+        loopTime += step;
+        if (loopState != LoopState::Playing)
+            return;
+        loopPos += step;
+        if (loopPos >= loopLength)
+        {
+            loopPos -= loopLength;
+            nextEvent = 0;
+        }
+        while (nextEvent < eventCount && events[(size_t) nextEvent].pos <= loopPos)
+            setLoopCode(events[(size_t) nextEvent++].code);
     }
 
     // ---- auto-strum ---------------------------------------------------------------------------
@@ -344,7 +526,7 @@ private:
             p = pending[(size_t) --pendingCount];
         }
 
-        if (!params.seqOn || heldCount == 0)
+        if (!params.seqOn || !chordSounding())
         {
             seqRunning = false;
             return;
@@ -399,6 +581,7 @@ private:
             if (rhythmRunning)
             {
                 rhythmRunning = false;
+                rhythm.stopAll(); // cut the drums, don't let them ring on
                 seqRunning = false; // the auto-strum goes back to its own timing
                 uiRhythmStep.store(-1, std::memory_order_relaxed);
             }
@@ -414,6 +597,8 @@ private:
             clock = 0.0;
             nextDrumStep = 0;
             currentPattern = index;
+            if (loopState == LoopState::Playing)
+                loopSeek(0.0); // the loop starts over with the drums
         }
         else if (index != currentPattern)
         {
@@ -558,8 +743,20 @@ private:
     double lfoPhase = 0.0;
     float lfoValue = 0.0f, lfoHeld = 0.0f, lfoSmooth = 0.01f;
 
-    std::atomic<int> uiHeld { -1 }, uiMemory { 0 }, uiRhythmStep { -1 };
-    std::atomic<float> uiLfo { 0.0f };
+    struct LoopEvent
+    {
+        double pos; // beats from the loop's start
+        int code; // chord
+    };
+    std::array<LoopEvent, 256> events {};
+    int eventCount = 0, nextEvent = 0, loopCode = -1;
+    LoopState loopState = LoopState::Empty;
+    double loopTime = 0.0; // beats, always running: the looper's own clock
+    double loopStart = 0.0, loopLength = 0.0, loopPos = 0.0;
+    bool loopOnBars = false;
+
+    std::atomic<int> uiHeld { -1 }, uiMemory { 0 }, uiRhythmStep { -1 }, uiLoopState { 0 };
+    std::atomic<float> uiLfo { 0.0f }, uiLoopBeats { 0.0f }, uiLoopPos { 0.0f };
     std::array<std::atomic<float>, kStrings> uiGlow;
 };
 } // namespace sdchord

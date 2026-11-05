@@ -49,6 +49,8 @@ EMSCRIPTEN_KEEPALIVE void sdc_note_on(int note, float velocity) { engine.noteOn(
 EMSCRIPTEN_KEEPALIVE void sdc_note_off(int note) { engine.noteOff(note); }
 EMSCRIPTEN_KEEPALIVE void sdc_control_change(int cc, int value) { engine.controlChange(cc, value); }
 EMSCRIPTEN_KEEPALIVE void sdc_all_notes_off() { engine.allNotesOff(); }
+EMSCRIPTEN_KEEPALIVE void sdc_loop_button() { engine.loopButton(); }
+EMSCRIPTEN_KEEPALIVE void sdc_loop_clear() { engine.loopClear(); }
 
 EMSCRIPTEN_KEEPALIVE void sdc_set_param(int id, float value)
 {
@@ -99,6 +101,9 @@ EMSCRIPTEN_KEEPALIVE float sdc_string_glow(int string) { return engine.stringGlo
 EMSCRIPTEN_KEEPALIVE int sdc_pluck_count() { return engine.pluckCount(); }
 EMSCRIPTEN_KEEPALIVE int sdc_rhythm_step() { return engine.rhythmStep(); }
 EMSCRIPTEN_KEEPALIVE int sdc_drum_hits() { return engine.drumHits(); }
+EMSCRIPTEN_KEEPALIVE int sdc_loop_state() { return engine.loopStatus(); }
+EMSCRIPTEN_KEEPALIVE float sdc_loop_beats() { return engine.loopBeats(); }
+EMSCRIPTEN_KEEPALIVE float sdc_loop_position() { return engine.loopPosition(); }
 
 // The rhythm patterns' shape, so the page can lay out its step LEDs (a test checks web/src agrees).
 EMSCRIPTEN_KEEPALIVE int sdc_rhythm_count() { return sdchord::kRhythmPatterns; }

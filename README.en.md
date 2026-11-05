@@ -29,11 +29,12 @@
 
 - **LFO:** moves the chords and strings with vibrato, tremolo, a filter sweep or side-to-side panning, as a sine, triangle, square or random wave from 0.1 to 12 Hz. The bass stays in tune and centred. A lamp blinks along with it.
 
-- **Rhythm machine (web version):** eight preset one-bar rhythms in the style of the old preset rhythm boxes (rock, disco, ballad, bossa nova, cumbia, rumba, waltz, swing). Every drum is synthesised, with no samples: kick, snare, rim, open and closed hats, two congas and a cowbell. It shares the tempo with the auto-strum, and while it runs it is the clock, so the strums lock to its grid. Enter starts and stops it.
+- **Rhythm machine (web version):** eight preset one-bar rhythms in the style of the old preset rhythm boxes (rock, disco, ballad, bossa nova, cumbia, rumba, waltz, swing). Every drum is synthesised, with no samples: kick, snare, rim, open and closed hats, two congas and a cowbell. It shares the tempo with the auto-strum, and while it runs it is the clock, so the strums lock to its grid. Enter starts and stops it; stopping cuts the drums dead, and closing its panel stops it too.
+- **Chord loop (web version):** record a round of chords (it starts with the first chord you play) and it keeps looping, so you can strum or run the auto-strum over it. Each chord lasts until the next one. With the rhythm machine on, the loop starts on the nearest bar line and lasts whole bars, so it stays with the drums; with the auto-strum on it lasts whole beats. A chord played by hand sounds over the loop, and letting go brings the loop back.
 
 ### Computer keyboard
 
-`1`–`0` major · `Q`–`P` minor · `A`–`Ñ` seventh · `Z`–`M` minor seventh (from C, left to right, Latin American layout) · space: auto-strum · enter: rhythm machine (web).
+`1`–`0` major · `Q`–`P` minor · `A`–`Ñ` seventh · `Z`–`M` minor seventh (in the buttons' order, from Db, Latin American layout) · space: auto-strum · enter: rhythm machine (web).
 
 ### From a DAW (MIDI)
 
@@ -67,7 +68,7 @@ web/      the browser version: React + TypeScript, the engine in an AudioWorklet
 - **Nothing allocates on the audio thread.** Delay lines are fixed-size arrays, and the UI reads the engine's state (held chord, string glow) from atomics.
 - **Validated like a DAW would load it:** CI runs [pluginval](https://github.com/Tracktion/pluginval) at its strictest level (10) on every push: different sample rates and block sizes, state save and restore, automation, parameter fuzzing, and opening the editor while audio runs.
 - **One engine, two homes.** The browser runs the very same `dsp/` code: the AudioWorklet instantiates the .wasm directly, sends notes and parameters as messages, and gets back the held chord and each string's level to draw. The page has multi-touch chord keys you can slide across, a strum plate that turns sideways on phones, the computer keyboard by physical key position (any layout), and Web MIDI controllers. Its 16 tests include the compiled engine itself, and a check that the parameter ids match the C++.
-- **Tested without a DAW:** the auto-strum's timing at every step length and the order of every pattern, chord voicings, the MIDI layout, the held-chord stack, strums crossing the right strings, decay times that don't depend on the sample rate, every LFO destination doing what it says (pitch, level, brightness and pan measured at the output), and a stress test with everything at maximum that stays finite and below full scale.
+- **Tested without a DAW:** the auto-strum's timing at every step length and the order of every pattern, chord voicings, the MIDI layout, the held-chord stack, strums crossing the right strings, decay times that don't depend on the sample rate, the chord loop playing back in order and in time (and in whole bars with the drums), every LFO destination doing what it says (pitch, level, brightness and pan measured at the output), and a stress test with everything at maximum that stays finite and below full scale.
 
 ## Building
 
@@ -88,6 +89,7 @@ cmake -S dsp -B dsp/build && cmake --build dsp/build --config Release && dsp/bui
 - [x] Auto-strum sequencer.
 - [x] LFO with vibrato, tremolo, filter and pan.
 - [x] A rhythm machine with preset patterns, locked to the auto-strum (web version).
+- [x] A chord loop to play over (web version).
 - [ ] An auto-bass that follows the chord in time with the drums.
 - [x] Computer-keyboard play: 1-0 major, Q-P minor, A-Ñ 7, Z-M m7 (Latin American layout).
 - [x] The web version: the same `dsp/` compiled to WebAssembly, playable on a phone.

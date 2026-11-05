@@ -191,6 +191,14 @@ public:
         return out;
     }
 
+    /** Stops every drum that is still ringing, with a few milliseconds' fade so it doesn't click. */
+    void stopAll()
+    {
+        for (auto& v : voices)
+            if (v.active())
+                v.choke();
+    }
+
     int hitCount() const { return hits; }
     bool sounding(Drum d) const { return voices[(size_t) d].active(); }
 

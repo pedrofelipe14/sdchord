@@ -7,13 +7,15 @@ interface Props {
   memory: number
   /** Hold mode: a tapped chord keeps sounding until another one is tapped (or the same one again). */
   latch: boolean
+  /** Changes when the engine let go of every chord (the loop took over): hold mode forgets its chord. */
+  forget: number
   onPress: (code: number) => void
   onRelease: (code: number) => void
 }
 
 /** 12 roots x 4 chord types as raised keys. Hold one to play its chord; slide onto another to switch.
     Every finger (pointer) is tracked on its own, so two thumbs can play at once. */
-export function ChordGrid({ rowNames, held, memory, latch, onPress, onRelease }: Props) {
+export function ChordGrid({ rowNames, held, memory, latch, forget, onPress, onRelease }: Props) {
   const fingers = useRef(new Map<number, number>()) // pointerId -> chord code under it
   const latched = useRef<number | undefined>(undefined) // the chord hold mode keeps sounding
   const [down, setDown] = useState<number[]>([])
@@ -36,6 +38,12 @@ export function ChordGrid({ rowNames, held, memory, latch, onPress, onRelease }:
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latch])
+
+  useEffect(() => {
+    latched.current = undefined // already released in the engine: no release to send
+    show()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forget])
 
   const codeAt = (x: number, y: number): number | undefined => {
     const el = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-code]')

@@ -1,7 +1,7 @@
 // Runs the C++ engine (compiled to sdchord.wasm) on the browser's audio thread.
 // The main thread sends the .wasm bytes once, then notes and parameter changes as messages.
 // About 45 times a second it gets back what the UI shows: the held chord, how loud each string rings,
-// and where the rhythm machine is in its bar.
+// where the rhythm machine is in its bar, and what the chord looper is doing.
 
 const STRINGS = 13
 const STATE_EVERY_BLOCKS = 4 // 4 x 128 frames ≈ 11 ms at 48 kHz: quick enough for the step LEDs
@@ -40,6 +40,8 @@ class SDChordProcessor extends AudioWorkletProcessor {
       case 'cc': e.sdc_control_change(msg.cc, msg.value); break
       case 'allNotesOff': e.sdc_all_notes_off(); break
       case 'param': e.sdc_set_param(msg.id, msg.value); break
+      case 'loopButton': e.sdc_loop_button(); break
+      case 'loopClear': e.sdc_loop_clear(); break
     }
   }
 
@@ -55,7 +57,16 @@ class SDChordProcessor extends AudioWorkletProcessor {
       const glow = new Float32Array(STRINGS)
       for (let s = 0; s < STRINGS; s++) glow[s] = e.sdc_string_glow(s)
       this.port.postMessage(
-        { type: 'state', held: e.sdc_held_chord(), memory: e.sdc_string_chord(), glow, rhythmStep: e.sdc_rhythm_step() },
+        {
+          type: 'state',
+          held: e.sdc_held_chord(),
+          memory: e.sdc_string_chord(),
+          glow,
+          rhythmStep: e.sdc_rhythm_step(),
+          loopState: e.sdc_loop_state(),
+          loopBeats: e.sdc_loop_beats(),
+          loopPos: e.sdc_loop_position(),
+        },
         [glow.buffer],
       )
     }

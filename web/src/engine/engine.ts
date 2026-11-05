@@ -7,6 +7,17 @@ type Message =
   | { type: 'cc'; cc: number; value: number }
   | { type: 'allNotesOff' }
   | { type: 'param'; id: ParamId; value: number }
+  | { type: 'loopButton' }
+  | { type: 'loopClear' }
+
+/** The chord looper's states, as in engine.h. */
+export enum LoopState {
+  Empty,
+  Armed, // waiting for the first chord
+  Recording,
+  Playing,
+  Stopped,
+}
 
 /** What the engine reports back for the UI. */
 export interface EngineState {
@@ -14,9 +25,20 @@ export interface EngineState {
   memory: number // chord the strings play
   glow: Float32Array // how loud each string rings
   rhythmStep: number // the rhythm machine's step in its bar, or -1 when stopped
+  loopState: LoopState
+  loopBeats: number // the loop's length in beats (while recording: how long so far)
+  loopPos: number // where the loop is, in beats
 }
 
-export const silentState = (): EngineState => ({ held: -1, memory: 0, glow: new Float32Array(STRINGS), rhythmStep: -1 })
+export const silentState = (): EngineState => ({
+  held: -1,
+  memory: 0,
+  glow: new Float32Array(STRINGS),
+  rhythmStep: -1,
+  loopState: LoopState.Empty,
+  loopBeats: 0,
+  loopPos: 0,
+})
 
 /** A tenth of a second of silence as a WAV file (8-bit mono), for the iPhone silent-switch workaround. */
 function silentWavUrl(): string {
@@ -150,6 +172,15 @@ export class SDChordEngine {
     if (kind === 0x90 && data2 > 0) this.send({ type: 'noteOn', note: data1, velocity: data2 / 127 })
     else if (kind === 0x80 || kind === 0x90) this.send({ type: 'noteOff', note: data1 })
     else if (kind === 0xb0) this.send({ type: 'cc', cc: data1, value: data2 })
+  }
+
+  /** The looper's one button: record (from the first chord), close and play, stop, play again. */
+  loopButton(): void {
+    this.send({ type: 'loopButton' })
+  }
+
+  loopClear(): void {
+    this.send({ type: 'loopClear' })
   }
 
   allNotesOff(): void {

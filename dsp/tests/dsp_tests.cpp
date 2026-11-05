@@ -482,19 +482,20 @@ TEST(rhythm_machine_plays_in_time_on_its_own)
     CHECK(e->drumHits() > 0);
 }
 
-TEST(stopping_the_rhythm_machine_lets_the_drums_ring_out)
+TEST(stopping_the_rhythm_machine_cuts_the_drums)
 {
     auto e = makeEngine();
     e->params.reverb = 0.0f;
     e->params.rhythmOn = true;
-    render(*e, 1.0);
+    e->params.rhythmPattern = 1; // Disco: an open hi-hat is ringing at the end of each beat
+    render(*e, 0.98);
     e->params.rhythmOn = false;
-    render(*e, 0.01);
+    render(*e, 0.01); // a few milliseconds' fade, no more
     CHECK(e->rhythmStep() == -1);
     const int hits = e->drumHits();
+    CHECK(render(*e, 0.05) < 1.0e-5f);
     render(*e, 1.5);
     CHECK(e->drumHits() == hits);
-    CHECK(render(*e, 0.1) < 1.0e-4f);
 }
 
 TEST(auto_strum_locks_to_the_drums)
@@ -673,6 +674,174 @@ TEST(lfo_pan_moves_the_sound_from_side_to_side)
     const size_t q = (size_t) (0.05 * sampleRate), half = (size_t) (0.5 * sampleRate);
     CHECK(rms(r, q, half - q) > 10.0f * rms(l, q, half - q)); // first half: right
     CHECK(rms(l, half + q, 2 * half - q) > 10.0f * rms(r, half + q, 2 * half - q)); // then left
+}
+
+// ---- chord looper -----------------------------------------------------------------------------
+
+namespace
+{
+int codeOf(const Chord& c) { return Engine::codeOf(c); }
+
+/** Taps a chord the way hold mode does: press it, and let go of the one before. */
+void tap(Engine& e, const Chord& c, const Chord* previous = nullptr)
+{
+    e.noteOn(noteForChord(c), 1.0f);
+    if (previous)
+        e.noteOff(noteForChord(*previous));
+}
+} // namespace
+
+TEST(looper_is_empty_and_silent_by_default)
+{
+    auto e = makeEngine();
+    CHECK(e->loopStatus() == (int) LoopState::Empty);
+    e->loopButton(); // armed: nothing happens until a chord is played
+    CHECK(e->loopStatus() == (int) LoopState::Armed);
+    CHECK(render(*e, 0.5) == 0.0f);
+    e->loopButton(); // closing with nothing recorded empties it again
+    CHECK(e->loopStatus() == (int) LoopState::Empty);
+}
+
+TEST(looper_plays_back_the_recorded_chords_in_time)
+{
+    auto e = makeEngine();
+    e->params.seqBpm = 120.0f; // a beat every 0.5 s
+    e->loopButton();
+    tap(*e, cMajor); // the first chord starts the recording
+    CHECK(e->loopStatus() == (int) LoopState::Recording);
+    render(*e, 1.0);
+    tap(*e, gMajor, &cMajor);
+    render(*e, 1.0);
+    e->noteOff(noteForChord(gMajor));
+    e->loopButton(); // 2 s = 4 beats
+    CHECK(e->loopStatus() == (int) LoopState::Playing);
+    CHECK(std::abs(e->loopBeats() - 4.0f) < 0.02f);
+
+    // It carries on from the top with nothing held: C for a second, then G.
+    render(*e, 0.1);
+    CHECK(e->heldChordCode() == codeOf(cMajor));
+    CHECK(e->chordSounding());
+    render(*e, 1.0);
+    CHECK(e->heldChordCode() == codeOf(gMajor));
+    render(*e, 1.0);
+    CHECK(e->heldChordCode() == codeOf(cMajor)); // round again
+}
+
+TEST(a_loop_of_four_chords_goes_round_in_order)
+{
+    auto e = makeEngine();
+    e->params.seqBpm = 100.0f;
+    const Chord fMajor { 5, ChordType::Major };
+    const Chord order[] = { cMajor, gMajor, aMinor, fMajor };
+    e->loopButton();
+    for (const auto& c : order) // played by key, each let go before the next
+    {
+        e->noteOn(noteForChord(c), 1.0f);
+        render(*e, 1.2);
+        e->noteOff(noteForChord(c));
+        render(*e, 0.02);
+    }
+    e->loopButton(); // 4 x 1.22 s long, from the top
+    for (int i = 1; i <= 40; ++i) // two rounds, every quarter second
+    {
+        render(*e, 0.25);
+        const double pos = std::fmod(0.25 * i, 4 * 1.22), into = std::fmod(pos, 1.22);
+        if (into > 0.05 && into < 1.17) // not right on a change
+            CHECK(e->heldChordCode() == codeOf(order[(int) (pos / 1.22)]));
+    }
+}
+
+TEST(a_chord_played_by_hand_sounds_over_the_loop)
+{
+    auto e = makeEngine();
+    e->params.seqBpm = 120.0f;
+    e->loopButton();
+    tap(*e, cMajor);
+    render(*e, 2.0);
+    e->loopButton();
+    render(*e, 0.1);
+    e->noteOn(noteForChord(aMinor), 1.0f);
+    render(*e, 0.1);
+    CHECK(e->heldChordCode() == codeOf(aMinor));
+    CHECK(e->loopStatus() == (int) LoopState::Playing); // still recording nothing, still looping
+    e->noteOff(noteForChord(aMinor));
+    CHECK(e->heldChordCode() == codeOf(cMajor)); // back to the loop
+}
+
+TEST(closing_the_loop_lets_go_of_held_chords)
+{
+    auto e = makeEngine();
+    e->params.seqBpm = 120.0f;
+    e->loopButton();
+    tap(*e, cMajor);
+    render(*e, 1.0);
+    tap(*e, gMajor, &cMajor); // hold mode: G stays down
+    render(*e, 1.0);
+    e->loopButton();
+    render(*e, 0.1);
+    CHECK(e->heldChordCode() == codeOf(cMajor)); // the loop, not the G still held
+}
+
+TEST(looper_stops_restarts_and_clears)
+{
+    auto e = makeEngine();
+    e->params.seqBpm = 120.0f;
+    e->loopButton();
+    tap(*e, cMajor);
+    render(*e, 1.0);
+    tap(*e, gMajor, &cMajor);
+    render(*e, 1.0);
+    e->noteOff(noteForChord(gMajor));
+    e->loopButton();
+    render(*e, 1.2); // into the G
+    e->loopButton();
+    CHECK(e->loopStatus() == (int) LoopState::Stopped);
+    CHECK(e->heldChordCode() == -1);
+    CHECK(!e->chordSounding());
+    e->loopButton(); // plays again from the top
+    CHECK(e->loopStatus() == (int) LoopState::Playing);
+    CHECK(e->heldChordCode() == codeOf(cMajor));
+    e->loopClear();
+    CHECK(e->loopStatus() == (int) LoopState::Empty);
+    CHECK(e->heldChordCode() == -1);
+}
+
+TEST(auto_strum_keeps_playing_over_the_loop)
+{
+    auto e = makeEngine();
+    e->params.seqBpm = 120.0f;
+    e->params.seqOn = true;
+    e->params.seqRate = 0; // one pluck per beat
+    e->loopButton();
+    tap(*e, cMajor);
+    render(*e, 1.9);
+    e->noteOff(noteForChord(cMajor));
+    e->loopButton(); // rounds to 4 beats with the auto-strum on
+    CHECK(std::abs(e->loopBeats() - 4.0f) < 1.0e-4f);
+    const int before = e->pluckCount();
+    render(*e, 2.0);
+    CHECK(e->pluckCount() - before == 4);
+}
+
+TEST(with_the_drums_the_loop_starts_on_a_bar_and_lasts_whole_bars)
+{
+    auto e = makeEngine();
+    e->params.seqBpm = 120.0f; // a bar of 4/4 every 2 s
+    e->params.rhythmOn = true;
+    render(*e, 1.9); // just before bar 2
+    e->loopButton();
+    tap(*e, cMajor); // a little early: it still counts as the downbeat
+    render(*e, 2.1);
+    tap(*e, gMajor, &cMajor); // bar 3
+    render(*e, 2.2);
+    e->noteOff(noteForChord(gMajor));
+    e->loopButton(); // a little late: rounds to 2 bars
+    CHECK(std::abs(e->loopBeats() - 8.0f) < 1.0e-4f);
+    CHECK(e->heldChordCode() == codeOf(cMajor)); // bar 4 (= the loop's first bar) is C
+    render(*e, 1.0);
+    CHECK(e->heldChordCode() == codeOf(cMajor));
+    render(*e, 1.0); // bar 5: G, together with the drums' downbeat
+    CHECK(e->heldChordCode() == codeOf(gMajor));
 }
 
 int main()
